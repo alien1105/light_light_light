@@ -1,0 +1,106 @@
+* {
+    box-sizing: border-box; 
+}
+
+body {
+    color: white;
+    background-color: #222;
+     margin:0;
+  padding:20px;
+  display:flex;
+  justify-content:center;
+  align-items:flex-start;
+  min-height:100vh;
+}
+
+
+
+/* menu bar */
+
+
+/* 效果預覽區 */
+
+
+/* 左側素材庫 */
+
+
+
+/* 右側控制面板 */
+
+
+/* 音樂控制區 */
+.music_and_effects {
+    width:100%;
+    max-width:1200px;
+    margin-top: 50%;
+}
+header h1 {
+    margin:35% 0 12px 0;
+    font-size:20px;
+    color:#dff6ff;
+}
+.controls {
+    display:flex;
+    gap:16px;
+    align-items:center;
+    margin-bottom:12px;
+}
+.music_file_load {
+    background:#1f2a36;
+    padding:8px 12px;
+    border-radius:8px;
+    cursor:pointer;
+    border:1px solid #2f3f4d;
+}
+.music_file_load input { 
+    display:none; 
+}
+
+.player-controls {
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+button {
+    background:#2b3946;
+    color:#e6eef8;
+    border:none;
+    padding:8px 12px;
+    border-radius:6px;
+    cursor:pointer;
+    transition: background 0.2s;
+}
+button:hover:not(:disabled) { 
+    background:#3b4a57; 
+}
+button:disabled { 
+    opacity:0.45; cursor:not-allowed; 
+}
+
+.waveform-wrap {
+    position: relative;
+    background: linear-gradient(180deg,#0b1220 0%, #07101a 100%);
+    padding:12px;
+    border-radius:8px;
+    border:1px solid #21303f;
+}
+canvas {
+    display:block;
+    width:100%;
+    height:auto;
+    max-height:240px;
+    border-radius:6px;
+    background:#07101a;
+    touch-action: none;
+    cursor: crosshair;
+}
+/*.hint {
+    position: absolute;
+    right: 18px;
+    top: 14px;
+    font-size:12px;
+    color:#8fb7c8;
+    opacity:0.9;
+    user-select:none;
+    pointer-events:none;
+}*/
