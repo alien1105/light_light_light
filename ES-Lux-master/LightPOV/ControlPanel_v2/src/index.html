@@ -7,12 +7,42 @@
     <link rel="stylesheet" href="./css/style.css"/>
 </head>
 <body>
+    <!--menu bar -->
+    <header class="menu_bar">
+      <div class="logo">menu bar</div>
+    </header>
+
     <div class = "row1"></div>
     <div class = "row2">
         <div></div>
         <div></div>
         <div></div>
     </div>
-    <div class = "row3"></div>
+    <!--音樂效果控制區-->
+    <div class="music_and_effects">
+    <header>
+      <h1>時間軸</h1>
+    </header>
+
+    <section class="controls">
+      <div class="music_file_load">
+        <button id="music_file_load_Btn">選擇音檔</button>
+        <input id="fileInput" type="file" accept="audio/*" hidden />
+      </div>
+
+      <div class="player-controls">
+        <button id="playToggle" disabled>▶ 播放</button>
+        <span id="time">00:00 / 00:00</span>
+      </div>
+    </section>
+
+    <section class="waveform-wrap">
+      <canvas id="waveform" width="900" height="60"></canvas>
+    </section>
+
+    <audio id="audio" controls style="display:none;"></audio>
+  </div>
+
+  <script src="./js/script.js"></script>
 </body>
 </html>
