@@ -34,6 +34,41 @@ function fmt(t) {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
+// 在分鐘或秒欄按 Enter 也能跳轉
+minInput.addEventListener("keydown", (ev) => {
+  // 按 Enter 時直接跳到秒數欄位
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    secInput.focus();
+  }
+});
+secInput.addEventListener("keydown", (ev) => {
+  // 在秒欄按 Enter 就跳轉到該時間
+  if (ev.key === "Enter") {
+    ev.preventDefault();
+    jumpToTime();
+  }
+});
+
+function jumpToTime() {
+  const minutes = parseInt(minInput.value, 10) || 0;
+  const seconds = parseInt(secInput.value, 10) || 0;
+  const totalSeconds = minutes * 60 + seconds;
+
+  if (!audio.duration) return alert("請先載入音樂");
+  if (totalSeconds < 0 || totalSeconds > audio.duration) {
+    alert("輸入的時間超出音樂長度");
+    return;
+  }
+  if (seconds > 59){
+    alert("秒數不可大於59")
+    return;
+  }
+  audio.currentTime = totalSeconds;
+  drawWave(audio.currentTime / audio.duration);
+  timeLabel.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
+}
+
 // Draw waveform and playhead
 function drawWave(progress = 0) {
   const w = canvas.clientWidth;

@@ -16,7 +16,9 @@ body {
 
 
 /* menu bar */
-
+.content{
+    color: #ffffff;
+}
 
 /* 效果預覽區 */
 
@@ -93,6 +95,25 @@ canvas {
     background:#07101a;
     touch-action: none;
     cursor: crosshair;
+}
+
+.time-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #dff6ff;
+  font-family: "Noto Sans TC", sans-serif;
+  font-size: 14px;
+}
+
+.time-controls input {
+  width: 50px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #2f3f4d;
+  background: #1f2a36;
+  color: #e6eef8;
+  text-align: center;
 }
 /*.hint {
     position: absolute;
