@@ -215,6 +215,28 @@ playToggle.addEventListener('click', async () => {
         cancelAnimationFrame(animationId);
     }
 });
+// 停止鍵
+const stopBtn = document.getElementById("stopBtn");
+
+// 當音樂載入後才啟用停止鍵
+audio.addEventListener("loadeddata", () => {
+  stopBtn.disabled = false;
+});
+
+// 停止鍵功能
+stopBtn.addEventListener("click", () => {
+  if (!audio.src) return;
+
+  // 停止播放
+  audio.pause();
+  audio.currentTime = 0;
+  cancelAnimationFrame(animationId);
+
+  // 更新畫面與按鈕
+  drawWave(0);
+  timeLabel.textContent = `00:00 / ${fmt(audio.duration)}`;
+  playToggle.textContent = "▶ 播放";
+});
 
 // audio end
 audio.addEventListener('ended', () => {
