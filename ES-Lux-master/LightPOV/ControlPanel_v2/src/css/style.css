@@ -115,6 +115,23 @@ canvas {
   color: #e6eef8;
   text-align: center;
 }
+
+.volume-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+#volumeSlider {
+  width: 150px;
+  cursor: pointer;
+}
+
+#volumeValue {
+  min-width: 40px;
+  text-align: right;
+}
 /*.hint {
     position: absolute;
     right: 18px;

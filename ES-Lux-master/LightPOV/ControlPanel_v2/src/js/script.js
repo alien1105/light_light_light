@@ -232,6 +232,19 @@ stopBtn.addEventListener("click", () => {
   audio.currentTime = 0;
   cancelAnimationFrame(animationId);
 
+// 音量控制
+const volumeSlider = document.getElementById("volumeSlider");
+const volumeValue = document.getElementById("volumeValue");
+
+// 初始音量
+audio.volume = 1;
+
+// 當滑桿改變時更新音量
+volumeSlider.addEventListener("input", () => {
+  const vol = volumeSlider.value / 100;
+  audio.volume = vol;
+  volumeValue.textContent = `${volumeSlider.value}%`;
+});
   // 更新畫面與按鈕
   drawWave(0);
   timeLabel.textContent = `00:00 / ${fmt(audio.duration)}`;

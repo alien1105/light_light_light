@@ -21,32 +21,39 @@
     <!--音樂效果控制區-->
     <div class="music_and_effects">
     <header>
-      <h1>時間軸</h1>
+        <h1>時間軸</h1>
     </header>
 
     <section class="controls">
-      <div class="music_file_load">
-        <button id="music_file_load_Btn">選擇音檔</button>
-        <input id="fileInput" type="file" accept="audio/*" hidden />
-      </div>
+        <div class="music_file_load">
+            <button id="music_file_load_Btn">選擇音檔</button>
+            <input id="fileInput" type="file" accept="audio/*" hidden />
+        </div>
 
-      <div class="player-controls">
-        <button id="playToggle" disabled>▶ 播放</button>
-        <button id="stopBtn" disabled>⏹ 停止</button>
-        <span id="time">00:00 / 00:00</span>
-      </div>
-      <div class="time-controls">
-      <div class="content">跳至時間:
-        <input id="minInput" type="number" min="0" /> :
-        <input id="secInput" type="number" min="0" max="59" /> 
+        <div class="player-controls">
+            <button id="playToggle" disabled>▶ 播放</button>
+            <button id="stopBtn" disabled>⏹ 停止</button>
+            <span id="time">00:00 / 00:00</span>
+        </div>
+        <div class="time-controls">
+            <div class="content">跳至時間:
+            <input id="minInput" type="number" min="0" /> :
+            <input id="secInput" type="number" min="0" max="59" /> 
+            </div>
+        </div>
+        <div class="volume-control">
+            <label for="volumeSlider">🔊 音量：</label>
+            <input type="range" id="volumeSlider" min="0" max="100" value="100">
+            <span id="volumeValue">100%</span>
+        </div>
     </section>
 
     <section class="waveform-wrap">
-      <canvas id="waveform" width="900" height="60"></canvas>
+        <canvas id="waveform" width="900" height="60"></canvas>
     </section>
 
     <audio id="audio" controls style="display:none;"></audio>
-  </div>
+    </div>
 
   <script src="./js/script.js"></script>
 </body>
