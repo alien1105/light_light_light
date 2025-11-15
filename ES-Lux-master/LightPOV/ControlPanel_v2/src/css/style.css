@@ -5,37 +5,273 @@
 body {
     color: white;
     background-color: #222;
-     margin:0;
-  padding:20px;
-  display:flex;
-  justify-content:center;
-  align-items:flex-start;
-  min-height:100vh;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 
 
 /* menu bar */
+.menu_bar {
+    flex: 0 0 auto; 
+    width: 100%;
+    padding: 10px 20px 0 20px;
+    box-sizing: border-box;
+}
 
 
+.row2 {
+    flex: 0 0 520px;
+    height: 520px;
+
+    width: 100%;
+    padding: 20px 20px 0 20px;
+    box-sizing: border-box;
+
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+    column-gap: 20px;
+}
 /* 效果預覽區 */
 
 
 /* 左側素材庫 */
+.Asset_library {
+    background: #1c1c1c;
+    border-right: 1px solid #333;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+    max-height: 100%;
+    overflow-y: hidden;  
+}
+
+.Asset_library_header {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.Asset_library_header .tab {
+    flex: 1;
+    background: #2a2a2a;
+    padding: 6px 0;
+    color: #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #3a3a3a;
+    text-align: center;
+    font-size: 14px;
+}
+
+.Asset_library_header .tab.active {
+    background: #3e4a52;
+    color: #fff;
+    border-color: #4a5a66;
+}
+
+.Asset_library_content {
+    display: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.Asset_library_content.active {
+    display: grid;
+}
+
+.Asset_item {
+    padding: 10px 8px;
+    background: #2d2d2d;
+    color: #eaeaea;
+    border-radius: 6px;
+    border: 1px solid #444;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.Asset_item:hover {
+    background: #3a3a3a;
+    border-color: #666;
+}
+
+.empty {
+    color: #aaa;
+    font-size: 13px;
+    padding: 10px;
+    text-align: center;
+}
 
 
 
-/* 右側控制面板 */
+/* ========== 右側參數面板 ========== */
+
+.param_panel {
+    background: #1c1c1c;
+    border-left: 1px solid #333;
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: #eee;
+    font-size: 14px;
+
+    height: 100%;
+    max-height: 100%;
+
+    display: flex;
+    flex-direction: column;
+    overflow: hidden; 
+}
+
+.param_header {
+    flex: 0 0 auto;
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.param_tab {
+    flex: 1;
+    padding: 6px 0;
+    border-radius: 6px;
+    border: 1px solid #3a3a3a;
+    background: #2a2a2a;
+    color: #ddd;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.param_tab.active {
+    background: #3e4a52;
+    color: #fff;
+    border-color: #4a5a66;
+}
+
+.param_block {
+    display: none;
+}
+
+.param_block.active {
+    display: block;
+}
+
+.param_body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    display: none;
+}
+
+.param_body.active {
+    display: block;
+}
+
+.param_group {
+    margin-bottom: 16px;
+    padding: 8px 6px;
+    border-radius: 6px;
+    background: #242424;
+}
+
+.param_group_title {
+    font-size: 13px;
+    margin-bottom: 6px;
+    color: #d0eaff;
+}
+
+.param_label_row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.param_label {
+    font-size: 14px;
+}
+
+.color_preview {
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    cursor: pointer;
+}
+
+/* 數字+ slide*/
+.param_field {
+    margin-bottom: 8px;
+}
+
+.param_field label {
+    display: block;
+    margin-bottom: 2px;
+    font-size: 13px;
+}
+
+.param_input_row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.param_input_row input[type="number"] {
+    width: 70px;
+    padding: 3px 4px;
+    border-radius: 4px;
+    border: 1px solid #444;
+    background: #111;
+    color: #eee;
+}
+
+.param_input_row input[type="range"] {
+    flex: 1;
+}
+
+/* 加入自訂義按鈕 */
+
+.btn_add_custom {
+    width: 100%;
+    margin-top: 4px;
+    padding: 6px 0;
+    border-radius: 6px;
+    border: 1px solid #486a8c;
+    background: #264563;
+    color: #dff6ff;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn_add_custom:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 左邊素材選中狀態 */
+
+.Asset_item.active {
+    outline: 2px solid #4fb3d6;
+}
 
 
 /* 音樂控制區 */
 .music_and_effects {
-    width:100%;
-    max-width:1200px;
-    margin-top: 50%;
+    flex: 0 0 auto;     
+    width: 100%;
+    max-width: 1200px;
+    margin: 24px auto 0 auto; 
+    padding: 0 20px 20px 20px;
+    box-sizing: border-box;
 }
 header h1 {
-    margin:35% 0 12px 0;
+    margin:8px 0 12px 0;
     font-size:20px;
     color:#dff6ff;
 }

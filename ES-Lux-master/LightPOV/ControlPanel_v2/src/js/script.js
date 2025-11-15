@@ -255,3 +255,117 @@ window.addEventListener('resize', () => {
         drawWave(progress);
   }
 });
+
+// asset library
+// ========== 素材庫切換 ==========
+document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.Asset_library_header .tab')
+            .forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.Asset_library_content')
+            .forEach(c => c.classList.remove('active'));
+        document.querySelector(`.Asset_library_content.${target}`).classList.add('active');
+    });
+});
+
+// ========== 素材庫點擊切換參數面板 ==========
+const assetItems = document.querySelectorAll('.Asset_library_content .Asset_item');
+const paramPanel = document.querySelector('.param_panel');
+const paramBlocks = document.querySelectorAll('.param_panel .param_block');
+const paramEmpty = document.querySelector('.param_panel .param_empty');
+const paramBodyParam = document.querySelector('.param_body--param');
+
+function resetParamBlock(block) {
+  if (!block) return;
+
+  // 重設所有 input
+  const inputs = block.querySelectorAll('input');
+  inputs.forEach(input => {
+    if (input.type === 'checkbox' || input.type === 'radio') {
+      input.checked = input.defaultChecked;
+    } else {
+      input.value = input.defaultValue;
+    }
+  });
+}
+
+assetItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const name = item.textContent.trim();
+
+    // 左邊選中樣式
+    assetItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+
+    // 空白提示隱藏
+    if (paramEmpty) {
+      paramEmpty.style.display = 'none';
+    }
+
+    // 捲軸回到最上面
+    if (paramBodyParam) {
+      paramBodyParam.scrollTop = 0;
+    }
+
+    // 顯示對應的 param_block 並重設內容
+    let activeBlock = null;
+    paramBlocks.forEach(block => {
+      if (block.dataset.effect === name) {
+        block.classList.add('active');
+        activeBlock = block;
+      } else {
+        block.classList.remove('active');
+      }
+    });
+
+    if (activeBlock) {
+      resetParamBlock(activeBlock);
+    }
+  });
+});
+
+// ========== 數字框 slider 互相同步 ==========
+document.querySelectorAll('.param_field').forEach(field => {
+  const num = field.querySelector('.param_number');
+  const range = field.querySelector('.param_range');
+  if (!num || !range) return;
+
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+  num.addEventListener('input', () => {
+    const min = Number(num.min ?? 0);
+    const max = Number(num.max ?? 100);
+    let v = Number(num.value || 0);
+    v = clamp(v, min, max);
+    num.value = v;
+    range.value = v;
+  });
+
+  range.addEventListener('input', () => {
+    num.value = range.value;
+  });
+});
+
+// ========== 參數 / 控制 tab 切換 ==========
+const paramTabs = document.querySelectorAll('.param_header .param_tab');
+const paramBodies = document.querySelectorAll('.param_body');
+
+paramTabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode; 
+
+    paramTabs.forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    paramBodies.forEach(body => {
+      if (body.classList.contains('param_body--' + mode)) {
+        body.classList.add('active');
+      } else {
+        body.classList.remove('active');
+      }
+    });
+  });
+});
