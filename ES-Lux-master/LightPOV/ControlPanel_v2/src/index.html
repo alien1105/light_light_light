@@ -4,6 +4,12 @@
     <meta charset="utf-8"/>
     <title>編招系統</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <link rel="stylesheet" href="./css/style.css"/><!doctype html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="utf-8"/>
+    <title>編招系統</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <link rel="stylesheet" href="./css/style.css"/>
 </head>
 <body>
@@ -14,9 +20,539 @@
 
     <div class = "row1"></div>
     <div class = "row2">
+        <div class="Asset_library">
+            <header class="Asset_library_header">
+                <button class="tab active" data-tab="preset">預設效果</button>
+                <button class="tab" data-tab="custom">自定義</button>
+            </header>
+
+            <div class="Asset_library_content preset active">
+                <div class="Asset_item">清除</div>
+                <div class="Asset_item">純色</div>
+                <div class="Asset_item">方形</div>
+                <div class="Asset_item">鐮刀</div>
+                <div class="Asset_item">扇形</div>
+                <div class="Asset_item">方塊</div>
+                <div class="Asset_item">DNA</div>
+                <div class="Asset_item">火焰</div>
+            </div>
+
+            <div class="Asset_library_content custom">
+                <p class="empty">目前尚無自定義素材</p>
+            </div>
+        </div> 
         <div></div>
-        <div></div>
-        <div></div>
+        <div class="param_panel">
+            <div class="param_header">
+                <button class="param_tab active" data-mode="param">參數</button>
+                <button class="param_tab" data-mode="control">控制</button>
+            </div>
+
+            <!-- 參數面板：放你現在所有的參數設定 -->
+            <div class="param_body param_body--param active">
+                <div class="param_empty">請從左側選擇一個素材</div>
+
+                <!-- 清除 -->
+                <div class="param_block" data-effect="清除">
+                    <p class="param_hint">清除效果沒有可調整的參數</p>
+                </div>
+
+                <!-- 純色 -->
+                <div class="param_block" data-effect="純色">
+                    <!-- 顏色 -->
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- 方形 -->
+                <div class="param_block" data-effect="方形">
+                    <!-- 顏色 -->
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- 鐮刀 -->
+                <div class="param_block" data-effect="鐮刀">
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- 長度 -->
+                    <div class="param_group">
+                        <div class="param_field">
+                            <label>長度</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="300" value="150">
+                                <input type="range" class="param_range" min="0" max="300" value="150">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label>曲度</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="50">
+                                <input type="range" class="param_range" min="0" max="100" value="50">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- 扇形 -->
+                <div class="param_block" data-effect="扇形">
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <div class="param_group">
+                        <div class="param_field">
+                            <label>扇葉數量</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="12" value="3">
+                                <input type="range" class="param_range" min="0" max="12" value="3">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label>長度</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="300" value="150">
+                                <input type="range" class="param_range" min="0" max="300" value="150">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label>曲度</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="50">
+                                <input type="range" class="param_range" min="0" max="100" value="50">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- 方塊 -->
+                <div class="param_block" data-effect="方塊">
+                    <!-- 顏色 -->
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- DNA -->
+                <div class="param_block" data-effect="DNA">
+                    <!-- 顏色 -->
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+
+                <!-- 火焰 -->
+                <div class="param_block" data-effect="火焰">
+                    <!-- 顏色 -->
+                    <div class="param_group">
+                        <div class="param_label_row">
+                            <span class="param_label">顏色</span>
+                            <input type="color" class="color_preview" value="#ffffff">
+                        </div>
+                    </div>
+
+                    <!-- X軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">X軸 HSV</div>
+                        <div class="param_field">
+                            <label> XH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> XV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Y軸 HSV -->
+                    <div class="param_group">
+                        <div class="param_group_title">Y軸 HSV</div>
+                        <div class="param_field">
+                            <label> YH (色相) °</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="360" value="0">
+                                <input type="range" class="param_range" min="0" max="360" value="0">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YS (飽和) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                        <div class="param_field">
+                            <label> YV (明度) %</label>
+                            <div class="param_input_row">
+                                <input type="number" class="param_number" min="0" max="100" value="100">
+                                <input type="range" class="param_range" min="0" max="100" value="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button class="btn_add_custom">加入自訂義素材庫</button>
+                </div>
+            </div>
+        </div>
     </div>
     <!--音樂效果控制區-->
     <div class="music_and_effects">
