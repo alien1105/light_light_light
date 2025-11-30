@@ -13,10 +13,12 @@
     <link rel="stylesheet" href="./css/style.css"/>
 </head>
 <body>
-    <!-- 區塊 1：menu bar -->
+    <!--menu bar -->
     <header class="menu_bar">
       <div class="logo">menu bar</div>
     </header>
+
+    <div class = "row1"></div>
     <div class = "row2">
         <div class="Asset_library">
             <header class="Asset_library_header">
@@ -947,10 +949,10 @@
     </header>
 
     <section class="controls">
-      <label class="music_file_load">
-        選擇音檔
-        <input id="fileInput" type="file" accept="audio/*" />
-      </label>
+      <div class="music_file_load">
+        <button id="music_file_load_Btn">選擇音檔</button>
+        <input id="fileInput" type="file" accept="audio/*" hidden />
+      </div>
 
       <div class="player-controls">
         <button id="playToggle" disabled>▶ 播放</button>
@@ -959,7 +961,7 @@
     </section>
 
     <section class="waveform-wrap">
-      <canvas id="waveform" width="1200" height="200"></canvas>
+      <canvas id="waveform" width="900" height="60"></canvas>
     </section>
 
     <audio id="audio" controls style="display:none;"></audio>

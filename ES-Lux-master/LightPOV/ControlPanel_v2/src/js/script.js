@@ -6,6 +6,7 @@ const timeLabel = document.getElementById('time');
 const canvas = document.getElementById('waveform');
 const ctx = canvas.getContext('2d');
 
+
 // fix for high-DPI screens
 function resizeCanvasToDisplaySize(c) {
   const dpr = window.devicePixelRatio || 1;
@@ -63,7 +64,6 @@ function drawWave(progress = 0) {
     ctx.beginPath();
     ctx.rect(0, 0, w * progress, h);
     ctx.clip();
-    ctx.beginPath();
     ctx.strokeStyle = playedColor;
     for (let x = 0; x < w; x++) {
       const idx = Math.floor(x * (peaks.length / w));
@@ -107,7 +107,7 @@ function computePeaks(buffer, count = 2000) {
 // update progress animation
 function animate() {
     if (!audioBuffer) return;
-    const duration = audio.duration || audioBuffer.duration;
+    const duration = audio.duration;
     const current = audio.currentTime;
     const progress = Math.min(1, current / duration);
     drawWave(progress);
@@ -125,7 +125,7 @@ function clientXToProgress(x) {
 // seek audio
 function seek(progress) {
     if (!audioBuffer) return;
-    const duration = audio.duration || audioBuffer.duration;
+    const duration = audio.duration;
     const time = Math.min(duration, Math.max(0, progress * duration));
     audio.currentTime = time;
     drawWave(progress);
@@ -133,6 +133,9 @@ function seek(progress) {
 }
 
 // file load
+document.getElementById('music_file_load_Btn').addEventListener('click', () => {
+    document.getElementById('fileInput').click();
+});
 fileInput.addEventListener('change', async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -152,7 +155,9 @@ fileInput.addEventListener('change', async (e) => {
     } catch {
         audioBuffer = await new Promise((res, rej) => audioCtx.decodeAudioData(buf, res, rej));
     }
-    peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(canvas.clientWidth * 2)));
+    const pixelWidth = canvas.width / (window.devicePixelRatio || 1);
+    peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(pixelWidth * 2)));                                                                                                                                                                                                  
+    /*peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(canvas.clientWidth * 2)));*/
     drawWave(0);
     timeLabel.textContent = `00:00 / ${fmt(audioBuffer.duration)}`;
 });
@@ -228,7 +233,7 @@ canvas.addEventListener('pointerup', (ev) => {
 // 平滑拖曳動畫（使用插值避免卡頓）
 function smoothDragAnimate() {
     if (!isDragging) return;
-    dragProgress += (dragTarget - dragProgress) * 0.25; // 插值過渡
+    dragProgress += (dragTarget - dragProgress); // 插值過渡
     drawWave(dragProgress);
 
   // 若音樂時間已載入，邊拖曳邊更新播放時間（即時預覽）
@@ -251,7 +256,7 @@ canvas.addEventListener('click', (ev) => {
 window.addEventListener('resize', () => {
     resizeCanvasToDisplaySize(canvas);
   if (audioBuffer) {
-        const progress = audio.currentTime / (audio.duration || audioBuffer.duration);
+        const progress = audio.currentTime / audio.duration;
         drawWave(progress);
   }
 });
