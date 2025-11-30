@@ -5,27 +5,116 @@
 body {
     color: white;
     background-color: #222;
-     margin:0;
-  padding:20px;
-  display:flex;
-  justify-content:center;
-  align-items:flex-start;
-  min-height:100vh;
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
 }
 
 
 
 /* menu bar */
+.menu_bar {
+    flex: 0 0 auto; 
+    width: 100%;
+    padding: 10px 20px 0 20px;
+    box-sizing: border-box;
+}
 
 
+.row2 {
+    flex: 0 0 520px;
+    height: 520px;
+
+    width: 100%;
+    padding: 20px 20px 0 20px;
+    box-sizing: border-box;
+
+    display: grid;
+    grid-template-columns: 260px minmax(0, 1fr) 320px;
+    column-gap: 20px;
+}
 /* 效果預覽區 */
 
 
 /* 左側素材庫 */
+.Asset_library {
+    background: #1c1c1c;
+    border-right: 1px solid #333;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+
+    height: 100%;
+    max-height: 100%;
+    overflow-y: hidden;  
+}
+
+.Asset_library_header {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.Asset_library_header .tab {
+    flex: 1;
+    background: #2a2a2a;
+    padding: 6px 0;
+    color: #ddd;
+    border-radius: 6px;
+    cursor: pointer;
+    border: 1px solid #3a3a3a;
+    text-align: center;
+    font-size: 14px;
+}
+
+.Asset_library_header .tab.active {
+    background: #3e4a52;
+    color: #fff;
+    border-color: #4a5a66;
+}
+
+.Asset_library_content {
+    display: none;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+}
+
+.Asset_library_content.active {
+    display: grid;
+}
+
+.Asset_item {
+    padding: 10px 8px;
+    background: #2d2d2d;
+    color: #eaeaea;
+    border-radius: 6px;
+    border: 1px solid #444;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.2s;
+}
+
+.Asset_item:hover {
+    background: #3a3a3a;
+    border-color: #666;
+}
+
+.empty {
+    color: #aaa;
+    font-size: 13px;
+    padding: 10px;
+    text-align: center;
+}
 
 
 
-/* 參數面板 */
+/* ========== 右側參數面板 ========== */
+
+/* 右側參數 / 控制面板外框 */
 .param_panel {
   background: #1c1c1c;
   border-left: 1px solid #333;
@@ -41,7 +130,7 @@ body {
   overflow: hidden;
 }
 
-/* tab 列：參數 / 控制 */
+/* 上方 tab 列：參數 / 控制 */
 .param_header {
   flex: 0 0 auto;
   display: flex;
@@ -66,7 +155,7 @@ body {
   border-color: #4a5a66;
 }
 
-/* 參數 / 控制 */
+/* 面板內容區：參數 / 控制 */
 .param_body {
   flex: 1 1 auto;
   overflow-y: auto;
@@ -83,12 +172,12 @@ body {
   color: #aaa;
 }
 
-/* 參數內容 */
+/* 主要參數內容 */
 .param_main.hidden {
   display: none;
 }
 
-/*   一般 group 樣式 */
+/* 一般 group 樣式 */
 .param_group {
   margin-bottom: 12px;
   padding: 8px 8px;
@@ -143,7 +232,7 @@ body {
   flex: 1;
 }
 
-/* 額外 group */
+/* 額外幾何 group（扇葉、長度、曲度）預設不顯示，JS 控制 */
 .extra_group {
   display: none;
 }
@@ -158,7 +247,7 @@ body {
   cursor: pointer;
 }
 
-/* 下方提示文字（例如控制面板尚未實作） */
+/* 下方提示文字 */
 .param_hint {
   font-size: 13px;
   color: #bbb;
@@ -241,7 +330,6 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
-
 /* 左邊素材選中狀態 */
 
 .Asset_item.active {
@@ -251,12 +339,15 @@ body {
 
 /* 音樂控制區 */
 .music_and_effects {
-    width:100%;
-    max-width:1200px;
-    margin-top: 100px;
+    flex: 0 0 auto;     
+    width: 100%;
+    max-width: 1200px;
+    margin: 24px auto 0 auto; 
+    padding: 0 20px 20px 20px;
+    box-sizing: border-box;
 }
 header h1 {
-    margin:35% 0 12px 0;
+    margin:8px 0 12px 0;
     font-size:20px;
     color:#dff6ff;
 }

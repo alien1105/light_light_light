@@ -275,13 +275,12 @@ document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
     });
 });
 
-// 效果設定
 const EFFECT_CONFIG = {
   "清除": { extras: [] },
   "純色": { extras: [] },
   "方形": { extras: ["boxsize"] },
   "方塊": { extras: ["boxsize", "space"] },
-  "DNA":   { extras: ["reverse", "space"] },
+  "DNA":  { extras: ["reverse", "space"] },
   "火焰": { extras: ["space"] },
   "鐮刀": { extras: ["position_fix", "length", "curvature"] },
   "扇形": { extras: ["bladeCount", "length", "curvature"] },
