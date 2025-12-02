@@ -1,6 +1,17 @@
-// import modules
-import * as fabric from 'fabric';
-import {ref, onMounted} from 'vue';
+// 修正 Fabric.js 對 textBaseline 使用 alphabetical 的 bug
+(function () {
+    const _set = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'textBaseline').set;
+    Object.defineProperty(CanvasRenderingContext2D.prototype, 'textBaseline', {
+        set(value) {
+            if (value === 'alphabetical') {
+                // 強制替換成合法值
+                value = 'alphabetic';
+            }
+            _set.call(this, value);
+        }
+    });
+})();
+
 // DOM elements
 const fileInput = document.getElementById('fileInput');
 const audio = document.getElementById('audio');
@@ -289,7 +300,7 @@ canvas.addEventListener('pointerup', (ev) => {
     canvas.releasePointerCapture(ev.pointerId);
 
     const p = clientXToProgress(ev.clientX);
-    audio.currentTime = (audio.duration || audioBuffer.duration) * p;
+    audio.currentTime = (audio.duration) * p;
     drawWave(p);
 
     if (wasPlayingBeforeDrag) {
@@ -449,10 +460,107 @@ paramTabs.forEach(tab => {
 });
 
 // timescale
-const timescale_canvas = ref(null);
-onMounted(() => {
-  drawRuler();
-});
+const { createApp, ref } = Vue;
 
+createApp({
+  setup() {
+    let timescale_canvas;
+    let timelineOffset = 0; // 目前時間軸左邊的時間（秒）
+    let isDragging = false;
+    let lastX = 0;
 
+    const secondsPerPixel = 1 / 100; // 每像素對應多少秒（= zoom level）
+    const majorTick = 1; // 每 1 秒一個刻度
 
+    const initCanvas = () => {
+      timescale_canvas = new fabric.Canvas("timelineCanvas", {
+        selection: false,
+      });
+
+      timescale_canvas.on("mouse:down", startDrag);
+      timescale_canvas.on("mouse:move", onDrag);
+      timescale_canvas.on("mouse:up", stopDrag);
+
+      drawTimeline();
+    };
+
+    // ========== 滑鼠拖曳時間軸 ==========
+    const startDrag = (e) => {
+      isDragging = true;
+      lastX = e.pointer.x;
+    };
+
+    const stopDrag = () => {
+      isDragging = false;
+    };
+
+    const onDrag = (e) => {
+      if (!isDragging) return;
+
+      const dx = e.pointer.x - lastX;
+      lastX = e.pointer.x;
+
+      // 修改時間軸的 offset（往右拖 → offset 變小）
+      timelineOffset -= dx * secondsPerPixel;
+      if (timelineOffset <= 0){
+        timelineOffset = 0;
+      }
+      drawTimeline();
+    };
+
+    // ========== 繪製時間軸 ==========
+    const drawTimeline = () => {
+      const canvas = timescale_canvas;
+      const w = canvas.getWidth();
+      canvas.clear();
+
+      // 目前畫面左邊 & 右邊的時間
+      const startSec = Math.floor(timelineOffset);
+      const endSec = startSec + w * secondsPerPixel;
+
+      // 主要時間軸線
+      const base = new fabric.Line([0, 60, w, 60], {
+        stroke: "#fff",
+        strokeWidth: 2,
+        selectable: false
+      });
+      canvas.add(base);
+
+      // 畫秒刻度
+      for (let t = startSec; t <= endSec; t += majorTick) {
+        const x = (t - timelineOffset) / secondsPerPixel;
+
+        // 小刻度
+        const tick = new fabric.Line([x, 40, x, 60], {
+          stroke: "#fff",
+          strokeWidth: 1,
+          selectable: false
+        });
+        canvas.add(tick);
+
+        // 時間文字格式 mm:ss
+        const mm = Math.floor(Math.abs(t) / 60)
+          .toString().padStart(2, "0");
+
+        const ss = (Math.abs(t) % 60)
+          .toString().padStart(2, "0");
+
+        const prefix = t < 0 ? "-" : "";
+
+        const label = new fabric.Text(`${prefix}${mm}:${ss}`, {
+          left: x + 3,
+          top: 0,
+          fill: "#ffffff",
+          fontSize: 12,
+          selectable: false
+        });
+        canvas.add(label);
+      }
+    };
+
+    // 初始化
+    setTimeout(initCanvas);
+
+    return {};
+  }
+}).mount("#app");
