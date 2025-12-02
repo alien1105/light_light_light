@@ -459,32 +459,42 @@ paramTabs.forEach(tab => {
   });
 });
 
-// timescale
+// =============================
+// 無限可拖曳 + 可縮放 Timeline
+// =============================
 const { createApp, ref } = Vue;
 
 createApp({
   setup() {
-    let timescale_canvas;
-    let timelineOffset = 0; // 目前時間軸左邊的時間（秒）
+    // 無限時間軸狀態
+    let timelineOffset = 0;          // 畫面左邊代表的「秒」
+    let secondsPerPixel = 1 / 100;   // 初始縮放比例：每 px = 0.01 秒
+    const minZoom = 1 / 500;        // 最放大 (px 越多, 時間越小)
+    const maxZoom = 1 /3;          // 最縮小 (px 越少, 時間越大)
+
+    // 拖曳參數
     let isDragging = false;
     let lastX = 0;
 
-    const secondsPerPixel = 1 / 100; // 每像素對應多少秒（= zoom level）
-    const majorTick = 1; // 每 1 秒一個刻度
-
+    // 初始化 Canvas
     const initCanvas = () => {
       timescale_canvas = new fabric.Canvas("timelineCanvas", {
         selection: false,
       });
 
+      // 事件：拖曳
       timescale_canvas.on("mouse:down", startDrag);
       timescale_canvas.on("mouse:move", onDrag);
       timescale_canvas.on("mouse:up", stopDrag);
+      timescale_canvas.on("mouse:out", stopDrag);
+
+      // 事件：滑鼠滾輪縮放
+      timescale_canvas.on("mouse:wheel", onWheel);
 
       drawTimeline();
     };
 
-    // ========== 滑鼠拖曳時間軸 ==========
+    // 滑鼠拖曳邏輯
     const startDrag = (e) => {
       isDragging = true;
       lastX = e.pointer.x;
@@ -500,67 +510,129 @@ createApp({
       const dx = e.pointer.x - lastX;
       lastX = e.pointer.x;
 
-      // 修改時間軸的 offset（往右拖 → offset 變小）
+      // 拖動時更改 offset
       timelineOffset -= dx * secondsPerPixel;
-      if (timelineOffset <= 0){
+      if(timelineOffset <= 0){
         timelineOffset = 0;
       }
       drawTimeline();
     };
 
-    // ========== 繪製時間軸 ==========
-    const drawTimeline = () => {
-      const canvas = timescale_canvas;
-      const w = canvas.getWidth();
-      canvas.clear();
+    // 縮放（滑鼠滾輪）
+    const onWheel = (opt) => {
+      const delta = opt.e.deltaY;
 
-      // 目前畫面左邊 & 右邊的時間
-      const startSec = Math.floor(timelineOffset);
-      const endSec = startSec + w * secondsPerPixel;
-
-      // 主要時間軸線
-      const base = new fabric.Line([0, 60, w, 60], {
-        stroke: "#fff",
-        strokeWidth: 2,
-        selectable: false
-      });
-      canvas.add(base);
-
-      // 畫秒刻度
-      for (let t = startSec; t <= endSec; t += majorTick) {
-        const x = (t - timelineOffset) / secondsPerPixel;
-
-        // 小刻度
-        const tick = new fabric.Line([x, 40, x, 60], {
-          stroke: "#fff",
-          strokeWidth: 1,
-          selectable: false
-        });
-        canvas.add(tick);
-
-        // 時間文字格式 mm:ss
-        const mm = Math.floor(Math.abs(t) / 60)
-          .toString().padStart(2, "0");
-
-        const ss = (Math.abs(t) % 60)
-          .toString().padStart(2, "0");
-
-        const prefix = t < 0 ? "-" : "";
-
-        const label = new fabric.Text(`${prefix}${mm}:${ss}`, {
-          left: x + 3,
-          top: 0,
-          fill: "#ffffff",
-          fontSize: 12,
-          selectable: false
-        });
-        canvas.add(label);
+      if (delta < 0) {
+        // 放大
+        secondsPerPixel *= 0.9;
+      } else {
+        // 縮小
+        secondsPerPixel *= 1.1;
       }
+
+      // 限制縮放範圍
+      secondsPerPixel = Math.min(maxZoom, Math.max(minZoom, secondsPerPixel));
+
+      drawTimeline();
+
+      opt.e.preventDefault();
+      opt.e.stopPropagation();
     };
 
+    // 🚀 核心：「無限時間軸」繪製
+const drawTimeline = () => {
+  const canvas = timescale_canvas;
+  const w = canvas.getWidth();
+  canvas.clear();
+
+  // 畫面可見的時間區間
+  const startSec = timelineOffset;
+  const endSec = timelineOffset + w * secondsPerPixel;
+
+  // 主線
+  canvas.add(
+    new fabric.Line([0, 60, w, 60], {
+      stroke: "#ffffff",
+      strokeWidth: 2,
+      selectable: false,
+    })
+  );
+
+  // 動態切換刻度密度
+  let majorTick = 1;
+  if (secondsPerPixel < 1 / 800) majorTick = 0.5;
+  if (secondsPerPixel < 1 / 1500) majorTick = 0.2;
+  if (secondsPerPixel > 1 / 40) majorTick = 5;
+  if (secondsPerPixel > 1 / 20) majorTick = 10;
+  if (secondsPerPixel > 1 / 10) majorTick = 30;
+  if (secondsPerPixel > 1 / 5) majorTick = 60;
+  // 🔥 讓刻度永遠從『整除 majorTick』的時間開始
+  let firstTick = Math.ceil(startSec / majorTick) * majorTick;
+
+  // 畫刻度
+  for (let t = firstTick; t <= endSec; t += majorTick) {
+    const x = (t - timelineOffset) / secondsPerPixel;
+
+    // 線
+    canvas.add(
+      new fabric.Line([x, 40, x, 60], {
+        stroke: "#ffffff",
+        strokeWidth: 1,
+        selectable: false,
+      })
+    );
+
+    // 格式化 mm:ss
+    const abs = Math.abs(t);
+    const mm = String(Math.floor(abs / 60)).padStart(2, "0");
+    const ss = String(Math.floor(abs % 60)).padStart(2, "0");
+    const prefix = t < 0 ? "-" : "";
+
+    canvas.add(
+      new fabric.Text(`${prefix}${mm}:${ss}`, {
+        left: x + 3,
+        top: 5,
+        fill: "#ffffff",
+        fontSize: 12,
+        selectable: false,
+      })
+    );
+  }
+};
+
+
+    // =============================
+    // Marker（可拖曳）
+    // =============================
+    const addMarker = () => {
+      const marker = new fabric.Triangle({
+        width: 14,
+        height: 14,
+        fill: "red",
+        left: 0,
+        top: 40,
+        originX: "center",
+        originY: "bottom",
+        hasControls: false,
+      });
+
+      marker.on("moving", () => {
+        marker.top = 40; // 鎖 Y
+
+        // 限制拖曳邊界（以目前視窗參考）
+        const w = timescale_canvas.getWidth();
+        if (marker.left < 0) marker.left = 0;
+        if (marker.left > w) marker.left = w;
+      });
+
+      timescale_canvas.add(marker);
+    };
+
+    // =============================
     // 初始化
+    // =============================
     setTimeout(initCanvas);
 
-    return {};
+    return { addMarker };
   }
 }).mount("#app");
