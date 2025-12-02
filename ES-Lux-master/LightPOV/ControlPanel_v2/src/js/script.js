@@ -503,6 +503,7 @@ createApp({
       // 修改時間軸的 offset（往右拖 → offset 變小）
       timelineOffset -= dx * secondsPerPixel;
       if (timelineOffset <= 0){
+        timelineOffset = 0;
       }
       drawTimeline();
     };
