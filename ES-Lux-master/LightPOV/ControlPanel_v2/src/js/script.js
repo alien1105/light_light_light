@@ -286,11 +286,24 @@ const EFFECT_CONFIG = {
   "扇形": { extras: ["bladeCount", "length", "curvature"] },
 };
 
+const MODE_EXTRAS = {
+  "MODES_CLEAR":      [],
+  "MODES_PLAIN":      [],
+  "MODES_SQUARE":     ["boxsize"],
+  "MODES_SICKLE":     ["position_fix", "length", "curvature"],
+  "MODES_FAN":        ["bladeCount", "length", "curvature"],
+  "MODES_BOXES":      ["boxsize", "space"],
+  "MODES_CMAP_DNA":   ["reverse", "space"],
+  "MODES_CMAP_FIRE":  ["space"]
+};
+
 const assetItems = document.querySelectorAll('.Asset_item');
 const paramEmpty = document.querySelector('.param_empty');
 const paramMain  = document.querySelector('.param_main');
 const paramBody  = document.querySelector('.param_body--param');
 const extraGroups = document.querySelectorAll('.extra_group');
+let currentCustomPresetId = null;   // 目前選中的自訂義 preset 的 _id
+let currentModeStr = "MODES_PLAIN";
 
 // Reset
 function resetAllParams() {
@@ -317,8 +330,10 @@ function resetAllParams() {
 assetItems.forEach(item => {
   item.addEventListener('click', () => {
     const name = item.textContent.trim();
-    
-    assetItems.forEach(i => i.classList.remove('active'));
+
+    currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
+
+    document.querySelectorAll('.Asset_item').forEach(i => i.classList.remove('active'));
     item.classList.add('active');
 
     paramEmpty.style.display = 'none';
@@ -468,10 +483,190 @@ const FUNC_CODE = {
   "step": 5
 };
 
-function to255(value, min, max) {
-  const v = Math.min(max, Math.max(min, Number(value) || 0));
-  return Math.round((v - min) / (max - min) * 255);
+// mode 字串 -> 中文
+const MODE_MAP_INV = {};
+for (const [cn, en] of Object.entries(MODE_MAP)) {
+  MODE_MAP_INV[en] = cn;
 }
+
+function normalizeTo255(value, min, max) {
+  const v = Number(value) || 0;
+  const lo = Number(min) || 0;
+  const hi = Number(max) || 1;
+  return Math.round((v - lo) / (hi - lo) * 255);
+}
+
+// 0~255 反映射回原本區間 [min, max]
+function from255(v255, min, max) {
+  const v  = Number(v255) || 0;
+  const lo = Number(min) || 0;
+  const hi = Number(max) || 1;
+  return Math.round(lo + (hi - lo) * (v / 255));
+}
+
+function getParamNorm(set, name, def = 0) {
+  const inp = set.querySelector(`.func_number[data-param="${name}"]`);
+  if (!inp) return def;
+
+  const v   = inp.value;
+  const min = inp.min;
+  const max = inp.max;
+
+  return normalizeTo255(v, min, max);
+}
+
+function collectExtras() {
+  const getNum = sel => {
+    const inp = document.querySelector(sel);
+    return inp ? Number(inp.value || 0) : 0;
+  };
+  const getChecked255 = sel => {
+    const inp = document.querySelector(sel);
+    return inp && inp.checked ? 255 : 0;
+  };
+
+  return {
+    curvature:   getNum('[data-extra="curvature"] .param_number'),
+    length:      getNum('[data-extra="length"] .param_number'),
+    bladeCount:  getNum('[data-extra="bladeCount"] .param_number'),
+    boxsize:     getNum('[data-extra="boxsize"] .param_number'),
+    space:       getNum('[data-extra="space"] .param_number'),
+    reverse:     getChecked255('[data-extra="reverse"] input[type="checkbox"]'),
+    positionFix: getNum('[data-extra="position_fix"] .param_number')
+  };
+}
+
+function packHsvBlock(key) {
+  const block = document.querySelector(`.hsv_block[data-key="${key}"]`);
+  if (!block) return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+
+  const select   = block.querySelector('.hsv_func_select');
+  const funcName = select.value;
+  const funcCode = FUNC_CODE[funcName] ?? 0;
+
+  if (funcCode === 0) {
+    return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+  }
+
+  // 找當前 active function 面板
+  const activeSet =
+    block.querySelector(`.hsv_func_params[data-func="${funcName}"].active`) ||
+    block.querySelector(`.hsv_func_params[data-func="${funcName}"]`);
+
+  const range = getParamNorm(activeSet, "range", 0);
+  const lower = getParamNorm(activeSet, "lower", 0);
+
+  switch (funcCode) {
+    case 1: { // Const
+      const value255 = getParamNorm(activeSet, "value", 0);
+      return { func: 1, range: 0, lower: 0, p1: value255, p2: 0 };
+    }
+
+    case 2: { // Ramp
+      const upper255 = getParamNorm(activeSet, "upper", 0);
+      return { func: 2, range, lower, p1: upper255, p2: 0 };
+    }
+
+    case 3: { // Tri
+      const upper255 = getParamNorm(activeSet, "upper", 0);
+      return { func: 3, range, lower, p1: upper255, p2: 0 };
+    }
+
+    case 4: { // Pulse
+      const top255 = getParamNorm(activeSet, "top", 0);
+      return { func: 4, range, lower, p1: top255, p2: 0 };
+    }
+
+    case 5: { // Step
+      const height255 = getParamNorm(activeSet, "height", 0);
+      const stepNum255 = getParamNorm(activeSet, "step", 0);
+      return { func: 5, range, lower, p1: height255, p2: stepNum255 };
+    }
+
+    default:
+      return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+  }
+}
+
+function packModePFields(modeStr, extras) {
+
+  let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+
+  switch (modeStr) {
+
+    case "MODES_CLEAR":
+    case "MODES_PLAIN":
+      break;
+
+    case "MODES_SQUARE":
+      p3 = normalizeTo255(extras.boxsize, 0, 300);
+      break;
+
+    case "MODES_SICKLE":
+      p1 = normalizeTo255(extras.positionFix, 0, 255);
+      p3 = normalizeTo255(extras.curvature, 0, 100);
+      p4 = normalizeTo255(extras.length, 0, 300);
+      break;
+
+    case "MODES_FAN":
+      p1 = normalizeTo255(extras.curvature, 0, 100);
+      p3 = normalizeTo255(extras.bladeCount, 0, 12);
+      p4 = normalizeTo255(extras.length, 0, 300);
+      break;
+
+    case "MODES_BOXES":
+      p3 = normalizeTo255(extras.boxsize, 0, 300);
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+
+    case "MODES_CMAP_DNA":
+      p1 = extras.reverse ? 255 : 0;
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+
+    case "MODES_CMAP_FIRE":
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+  }
+
+  return { p1, p2, p3, p4 };
+}
+
+function buildSegmentFromUI(startTime, duration) {
+  const modeStr = currentModeStr || "MODES_PLAIN";
+
+  // 六組 HSV
+  const XH = packHsvBlock("XH");
+  const XS = packHsvBlock("XS");
+  const XV = packHsvBlock("XV");
+  const YH = packHsvBlock("YH");
+  const YS = packHsvBlock("YS");
+  const YV = packHsvBlock("YV");
+
+  // p1~p4
+  const extras = collectExtras();
+  const { p1, p2, p3, p4 } = packModePFields(modeStr, extras);
+
+  return {
+    mode: modeStr,
+    start_time: startTime,
+    duration: duration,
+    XH, XS, XV,
+    YH, YS, YV,
+    p1, p2, p3, p4
+  };
+}
+
+function buildEffectConfigFromUI() {
+  const seg = buildSegmentFromUI(0, 0);
+  const { start_time, duration, ...effectConfig } = seg;
+
+  return effectConfig;
+}
+
+// 轉字串寫法
+// const obj = buildEffectConfigFromUI();
+// const jsonStr = JSON.stringify(obj, null, 2);
 
 function sendToSettime(jsonPath) {
   const currentPlaybackTime = 0; 
@@ -484,4 +679,344 @@ function sendToSettime(jsonPath) {
       current_time: currentPlaybackTime
     })
   })
+}
+
+// 自訂義加入
+const btnAddCustom = document.querySelector('.btn_add_custom');
+const btnUpdateCustom = document.querySelector('.btn_update_custom');
+const btnDeleteCustom = document.querySelector('.btn_delete_custom');
+
+function setCustomButtonsEnabled(enabled) {
+  if (btnUpdateCustom) btnUpdateCustom.disabled = !enabled;
+  if (btnDeleteCustom) btnDeleteCustom.disabled = !enabled;
+}
+
+function genPresetId() {
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'preset_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+}
+
+const CUSTOM_PRESET_KEY = "luxCustomPresets_v1";
+
+function loadCustomPresets() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PRESET_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+
+    // 如果舊資料沒有 _id，就幫它補一個，避免衝突
+    let changed = false;
+    arr.forEach(p => {
+      if (!p._id) {
+        p._id = genPresetId();
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(arr));
+    }
+    return arr;
+  } catch (e) {
+    console.error("loadCustomPresets error", e);
+    return [];
+  }
+}
+
+function saveCustomPresets(list) {
+  try {
+    localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error("saveCustomPresets error", e);
+  }
+}
+
+// 還原到UI
+function ensureParamPanelVisible() {
+  // 切到「參數」這頁 tab
+  const tabs = document.querySelectorAll('.param_tab');
+  const bodies = document.querySelectorAll('.param_body');
+  const paramTab = document.querySelector('.param_tab[data-target="params"]') || tabs[0];
+  const paramBody = document.querySelector('.param_body[data-pane="params"]') || bodies[0];
+
+  if (tabs.length && paramTab) {
+    tabs.forEach(t => t.classList.remove('active'));
+    paramTab.classList.add('active');
+  }
+  if (bodies.length && paramBody) {
+    bodies.forEach(b => b.classList.remove('active'));
+    paramBody.classList.add('active');
+  }
+
+  // 把「請從左側選擇一個素材」藏起來，顯示真正的內容
+  const empty = document.querySelector('.param_empty');
+  const main = document.querySelector('.param_main');
+  if (empty) empty.style.display = 'none';
+  if (main) main.classList.remove('hidden');
+}
+
+function setParamFrom255(setElem, paramName, value255) {
+  if (!setElem) return;
+  const num = setElem.querySelector(`.func_number[data-param="${paramName}"]`);
+  if (!num) return;
+
+  const min = num.min;
+  const max = num.max;
+  const uiVal = from255(value255, min, max);
+  num.value = uiVal;
+
+  const range = setElem.querySelector(`.func_range[data-param="${paramName}"]`);
+  if (range) {
+    range.value = uiVal;
+  }
+}
+
+function fillHsvBlockFromConfig(key, cfgBlock) {
+  const block = document.querySelector(`.hsv_block[data-key="${key}"]`);
+  if (!block || !cfgBlock) return;
+
+  const select = block.querySelector('.hsv_func_select');
+  if (!select) return;
+
+  let funcName = "none";
+  for (const [name, code] of Object.entries(FUNC_CODE)) {
+    if (code === cfgBlock.func) {
+      funcName = name;
+      break;
+    }
+  }
+
+  select.value = funcName;
+
+  select.dispatchEvent(new Event('change'));
+
+  // 找當前這個 function 的 set
+  const set = block.querySelector(`.hsv_func_params[data-func="${funcName}"]`);
+  if (!set) return;
+
+  // 還原 range / lower
+  setParamFrom255(set, "range", cfgBlock.range);
+  setParamFrom255(set, "lower", cfgBlock.lower);
+
+  // 還原各 func 的 p1/p2
+  switch (cfgBlock.func) {
+    case 1: // Const: p1 = value
+      setParamFrom255(set, "value", cfgBlock.p1);
+      break;
+    case 2: // Ramp: p1 = upper
+    case 3: // Tri:  p1 = upper
+      setParamFrom255(set, "upper", cfgBlock.p1);
+      break;
+    case 4: // Pulse: p1 = top
+      setParamFrom255(set, "top", cfgBlock.p1);
+      break;
+    case 5: // Step: p1 = height, p2 = step
+      setParamFrom255(set, "height", cfgBlock.p1);
+      setParamFrom255(set, "step",   cfgBlock.p2);
+      break;
+  }
+}
+
+function setExtraNumber(extraName, value255, min, max) {
+  const group = document.querySelector(`[data-extra="${extraName}"]`);
+  if (!group) return;
+
+  const num = group.querySelector('.param_number');
+  if (!num) return;
+
+  const uiVal = from255(value255, min, max);
+  num.value = uiVal;
+
+  const range = group.querySelector('.param_range');
+  if (range) {
+    range.value = uiVal;
+  }
+}
+
+function applyExtrasFromPFields(modeStr, p1, p2, p3, p4) {
+  switch (modeStr) {
+    case "MODES_SQUARE":
+      setExtraNumber("boxsize", p3, 0, 300);
+      break;
+
+    case "MODES_SICKLE":
+      setExtraNumber("position_fix", p1, 0, 255);
+      setExtraNumber("curvature",    p3, 0, 100);
+      setExtraNumber("length",       p4, 0, 300);
+      break;
+
+    case "MODES_FAN":
+      setExtraNumber("curvature",   p1, 0, 100);
+      setExtraNumber("bladeCount",  p3, 0, 12);
+      setExtraNumber("length",      p4, 0, 300);
+      break;
+
+    case "MODES_BOXES":
+      setExtraNumber("boxsize", p3, 0, 300);
+      setExtraNumber("space",   p4, 0, 100);
+      break;
+
+    case "MODES_CMAP_DNA": {
+      // reverse: 0 or 255
+      const chk = document.querySelector('[data-extra="reverse"] input[type="checkbox"]');
+      if (chk) chk.checked = (p1 >= 128);
+      setExtraNumber("space", p4, 0, 100);
+      break;
+    }
+
+    case "MODES_CMAP_FIRE":
+      setExtraNumber("space", p4, 0, 100);
+      break;
+  }
+}
+
+function applyPresetToUI(preset) {
+  if (!preset) return;
+
+  const modeStr = preset.mode || "MODES_PLAIN";
+  currentModeStr = modeStr;   
+
+  const cnName  = MODE_MAP_INV[modeStr] || "純色";
+  window.currentEffectName = cnName; 
+
+  ensureParamPanelVisible();
+
+  const extras = MODE_EXTRAS[modeStr] || [];
+  extraGroups.forEach(g => {
+    const key = g.dataset.extra;
+    g.style.display = extras.includes(key) ? "block" : "none";
+  });
+
+  if (modeStr === "MODES_CLEAR") {
+    paramMain.classList.add('hidden');
+  } else {
+    paramMain.classList.remove('hidden');
+  }
+
+  fillHsvBlockFromConfig("XH", preset.XH);
+  fillHsvBlockFromConfig("XS", preset.XS);
+  fillHsvBlockFromConfig("XV", preset.XV);
+  fillHsvBlockFromConfig("YH", preset.YH);
+  fillHsvBlockFromConfig("YS", preset.YS);
+  fillHsvBlockFromConfig("YV", preset.YV);
+
+  applyExtrasFromPFields(modeStr, preset.p1, preset.p2, preset.p3, preset.p4);
+}
+// 建立小方塊
+function createCustomAssetElement(preset) {
+  const div = document.createElement('div');
+  div.className = 'Asset_item Asset_item--custom';
+  div.dataset.customId = preset._id;
+
+  const modeLabel = (preset.mode || "").replace(/^MODES_/, "");
+  div.textContent = `[自訂] ${modeLabel}`;
+
+  div.addEventListener('click', () => {
+    document.querySelectorAll('.Asset_item').forEach(it => it.classList.remove('active'));
+    div.classList.add('active');
+
+    // 記錄目前選中的自訂義
+    currentCustomPresetId = preset._id;
+    setCustomButtonsEnabled(true);
+
+    applyPresetToUI(preset);
+  });
+
+  return div;
+}
+
+function reloadCustomPresetsUI() {
+  const container = document.querySelector('.Asset_library_content.custom');
+  if (!container) return;
+
+  const list = loadCustomPresets();
+  container.innerHTML = "";
+
+  list.forEach(preset => {
+    const item = createCustomAssetElement(preset);
+    container.appendChild(item);
+
+    // 如果這顆就是 currentCustomPresetId，就讓它保持亮
+    if (preset._id === currentCustomPresetId) {
+      item.classList.add('active');
+    }
+  });
+
+  // 如果沒有任何自訂義，就把按鈕關閉
+  if (!list.length) {
+    currentCustomPresetId = null;
+    setCustomButtonsEnabled(false);
+  }
+}
+
+
+// 綁定按鈕
+function addCurrentToCustomLibrary() {
+  const cfg = buildEffectConfigFromUI(); 
+  const preset = {
+    _id: genPresetId(),
+    ...cfg
+  };
+
+  const list = loadCustomPresets();
+  list.push(preset);
+  saveCustomPresets(list);
+
+  // 新增完，視為選中這個 preset
+  currentCustomPresetId = preset._id;
+  setCustomButtonsEnabled(true);
+  reloadCustomPresetsUI();
+}
+
+// 綁定新增按鈕
+if (btnAddCustom) {
+  btnAddCustom.addEventListener('click', addCurrentToCustomLibrary);
+}
+
+// 刪除與修改自定義
+function updateCurrentCustomPreset() {
+  if (!currentCustomPresetId) return; 
+
+  const list = loadCustomPresets();
+  const idx = list.findIndex(p => p._id === currentCustomPresetId);
+  if (idx === -1) return;
+
+  // 讀現在 UI 的設定
+  const cfg = buildEffectConfigFromUI();
+
+  // 保留原本 _id，其他用新的設定覆蓋
+  list[idx] = { _id: currentCustomPresetId, ...cfg };
+  saveCustomPresets(list);
+
+  reloadCustomPresetsUI();
+}
+
+// 綁定按鈕
+if (btnUpdateCustom) {
+  btnUpdateCustom.addEventListener('click', updateCurrentCustomPreset);
+}
+
+function deleteCurrentCustomPreset() {
+  if (!currentCustomPresetId) return;
+
+  let list = loadCustomPresets();
+  const idx = list.findIndex(p => p._id === currentCustomPresetId);
+  if (idx === -1) return;
+
+  list.splice(idx, 1);
+  saveCustomPresets(list);
+
+  currentCustomPresetId = null;
+  setCustomButtonsEnabled(false);
+  reloadCustomPresetsUI();
+
+  resetAllParams();
+  paramMain.classList.add('hidden');
+  paramEmpty.style.display = 'block';
+}
+
+if (btnDeleteCustom) {
+  btnDeleteCustom.addEventListener('click', deleteCurrentCustomPreset);
 }
