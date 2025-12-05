@@ -260,3 +260,228 @@ window.addEventListener('resize', () => {
         drawWave(progress);
   }
 });
+
+// asset library
+document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.Asset_library_header .tab')
+            .forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.Asset_library_content')
+            .forEach(c => c.classList.remove('active'));
+        document.querySelector(`.Asset_library_content.${target}`).classList.add('active');
+    });
+});
+
+const EFFECT_CONFIG = {
+  "清除": { extras: [] },
+  "純色": { extras: [] },
+  "方形": { extras: ["boxsize"] },
+  "方塊": { extras: ["boxsize", "space"] },
+  "DNA":  { extras: ["reverse", "space"] },
+  "火焰": { extras: ["space"] },
+  "鐮刀": { extras: ["position_fix", "length", "curvature"] },
+  "扇形": { extras: ["bladeCount", "length", "curvature"] },
+};
+
+const assetItems = document.querySelectorAll('.Asset_item');
+const paramEmpty = document.querySelector('.param_empty');
+const paramMain  = document.querySelector('.param_main');
+const paramBody  = document.querySelector('.param_body--param');
+const extraGroups = document.querySelectorAll('.extra_group');
+
+// Reset
+function resetAllParams() {
+  paramMain.querySelectorAll('input').forEach(inp => {
+    if (inp.type === "checkbox" || inp.type === "radio")
+      inp.checked = inp.defaultChecked;
+    else
+      inp.value = inp.defaultValue;
+  });
+
+  // Reset HSV function
+  paramMain.querySelectorAll('.hsv_block').forEach(block => {
+    const sel = block.querySelector('.hsv_func_select');
+    const sets = block.querySelectorAll('.hsv_func_params');
+
+    sel.selectedIndex = 0;
+    const func = sel.value;
+
+    sets.forEach(s => s.classList.toggle('active', s.dataset.func === func));
+  });
+}
+
+// 點素材 顯示對應參數
+assetItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const name = item.textContent.trim();
+    
+    assetItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+
+    paramEmpty.style.display = 'none';
+    paramMain.classList.remove('hidden');
+    paramBody.scrollTop = 0;
+
+    resetAllParams();
+
+    const cfg = EFFECT_CONFIG[name] || { extras: [] };
+
+    extraGroups.forEach(g => {
+      const key = g.dataset.extra;
+      g.style.display = cfg.extras.includes(key) ? "block" : "none";
+    });
+
+    if (name === "清除") {
+      paramMain.classList.add('hidden');
+    }
+  });
+});
+
+// HSV Function 切換
+document.querySelectorAll('.hsv_block').forEach(block => {
+  const select    = block.querySelector('.hsv_func_select');
+  const paramSets = block.querySelectorAll('.hsv_func_params');
+
+  if (!select) return;
+
+  // func_number <-> func_range 
+  paramSets.forEach(set => {
+    const numbers = set.querySelectorAll('.func_number');
+
+    numbers.forEach(num => {
+      const paramName = num.dataset.param;
+      if (!paramName) return;
+
+      const range = set.querySelector(`.func_range[data-param="${paramName}"]`);
+      if (!range) return;
+
+      const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+      // number -> range
+      num.addEventListener('input', () => {
+        const min = Number(num.min ?? 0);
+        const max = Number(num.max ?? 255);
+        let v = Number(num.value || 0);
+        v = clamp(v, min, max);
+        num.value = v;
+        range.value = v;
+      });
+
+      // range -> number
+      range.addEventListener('input', () => {
+        num.value = range.value;
+      });
+    });
+  });
+
+  // 切換 function（Const / Ramp / Tri / Pulse / Step）
+  select.addEventListener('change', () => {
+    const func = select.value;
+
+    paramSets.forEach(set => {
+      const isActive = set.dataset.func === func;
+      set.classList.toggle('active', isActive);
+
+      if (isActive) {
+        const inputs = set.querySelectorAll('input');
+
+        inputs.forEach(inp => {
+          if (inp.type === 'checkbox' || inp.type === 'radio') {
+            inp.checked = inp.defaultChecked;
+          } else if (inp.defaultValue !== undefined && inp.defaultValue !== '') {
+            inp.value = inp.defaultValue;
+          } else if (inp.min !== undefined && inp.max !== undefined) {
+            inp.value = inp.min || 0;
+          }
+        });
+      }
+    });
+  });
+
+  select.dispatchEvent(new Event('change'));
+});
+
+// 額外參數 數字 <-> 滑桿 同步 
+
+document.querySelectorAll('.extra_group').forEach(group => {
+  const numbers = group.querySelectorAll('.param_number');
+
+  numbers.forEach(num => {
+    const row = num.closest('.param_input_row');
+    if (!row) return;
+    const range = row.querySelector('.param_range');
+    if (!range) return;
+
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+    // number -> range
+    num.addEventListener('input', () => {
+      const min = Number(num.min ?? 0);
+      const max = Number(num.max ?? 255);
+      let v = Number(num.value || 0);
+      v = clamp(v, min, max);
+      num.value = v;
+      range.value = v;
+    });
+
+    // range -> number
+    range.addEventListener('input', () => {
+      num.value = range.value;
+    });
+  });
+});
+
+// 切換（參數 / 控制）
+document.querySelectorAll('.param_tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+
+    document.querySelectorAll('.param_tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    document.querySelectorAll('.param_body').forEach(b => {
+      b.classList.toggle('active', b.classList.contains(`param_body--${mode}`));
+    });
+  });
+});
+
+const MODE_MAP = {
+  "清除": "MODES_CLEAR",
+  "純色": "MODES_PLAIN",
+  "方形": "MODES_SQUARE",
+  "鐮刀": "MODES_SICKLE",
+  "扇形": "MODES_FAN",
+  "方塊": "MODES_BOXES",
+  "DNA":  "MODES_CMAP_DNA",
+  "火焰": "MODES_CMAP_FIRE",
+};
+
+const FUNC_CODE = {
+  "none": 0,
+  "const": 1,
+  "ramp": 2,
+  "tri": 3,
+  "pulse": 4,
+  "step": 5
+};
+
+function to255(value, min, max) {
+  const v = Math.min(max, Math.max(min, Number(value) || 0));
+  return Math.round((v - min) / (max - min) * 255);
+}
+
+function sendToSettime(jsonPath) {
+  const currentPlaybackTime = 0; 
+
+  fetch('/settime', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: jsonPath,
+      current_time: currentPlaybackTime
+    })
+  })
+}
