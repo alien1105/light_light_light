@@ -14,33 +14,273 @@
 
 // DOM elements
 const fileInput = document.getElementById('fileInput');
+const musicFileLoadBtn = document.getElementById('music_file_load_Btn');
 const audio = document.getElementById('audio');
 const playToggle = document.getElementById('playToggle');
+const stopBtn = document.getElementById('stopBtn');
 const timeLabel = document.getElementById('time');
-const canvas = document.getElementById('waveform');
-const ctx = canvas.getContext('2d');
 
+const minInput = document.getElementById('minInput');
+const secInput = document.getElementById('secInput');
 
-// fix for high-DPI screens
-function resizeCanvasToDisplaySize(c) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = c.getBoundingClientRect();
-  c.width = Math.floor(rect.width * dpr);
-  c.height = Math.floor(rect.height * dpr);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.scale(dpr, dpr);
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeValue = document.getElementById('volumeValue');
+
+const timelineCanvasEl = document.getElementById('timelineCanvas');
+
+// asset library
+document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.Asset_library_header .tab')
+            .forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        const target = tab.dataset.tab;
+        document.querySelectorAll('.Asset_library_content')
+            .forEach(c => c.classList.remove('active'));
+        document.querySelector(`.Asset_library_content.${target}`).classList.add('active');
+    });
+});
+
+const EFFECT_CONFIG = {
+  "清除": { extras: [] },
+  "純色": { extras: [] },
+  "方形": { extras: ["boxsize"] },
+  "方塊": { extras: ["boxsize", "space"] },
+  "DNA":  { extras: ["reverse", "space"] },
+  "火焰": { extras: ["space"] },
+  "鐮刀": { extras: ["position_fix", "length", "curvature"] },
+  "扇形": { extras: ["bladeCount", "length", "curvature"] },
+};
+
+const assetItems = document.querySelectorAll('.Asset_item');
+const paramEmpty = document.querySelector('.param_empty');
+const paramMain  = document.querySelector('.param_main');
+const paramBody  = document.querySelector('.param_body--param');
+const extraGroups = document.querySelectorAll('.extra_group');
+
+// Reset
+function resetAllParams() {
+  paramMain.querySelectorAll('input').forEach(inp => {
+    if (inp.type === "checkbox" || inp.type === "radio")
+      inp.checked = inp.defaultChecked;
+    else
+      inp.value = inp.defaultValue;
+  });
+
+  // Reset HSV function
+  paramMain.querySelectorAll('.hsv_block').forEach(block => {
+    const sel = block.querySelector('.hsv_func_select');
+    const sets = block.querySelectorAll('.hsv_func_params');
+
+    sel.selectedIndex = 0;
+    const func = sel.value;
+
+    sets.forEach(s => s.classList.toggle('active', s.dataset.func === func));
+  });
 }
-resizeCanvasToDisplaySize(canvas);
 
-// Audio variables
+// 點素材 顯示對應參數
+assetItems.forEach(item => {
+  item.addEventListener('click', () => {
+    const name = item.textContent.trim();
+    
+    assetItems.forEach(i => i.classList.remove('active'));
+    item.classList.add('active');
+
+    paramEmpty.style.display = 'none';
+    paramMain.classList.remove('hidden');
+    paramBody.scrollTop = 0;
+
+    resetAllParams();
+
+    const cfg = EFFECT_CONFIG[name] || { extras: [] };
+
+    extraGroups.forEach(g => {
+      const key = g.dataset.extra;
+      g.style.display = cfg.extras.includes(key) ? "block" : "none";
+    });
+
+    if (name === "清除") {
+      paramMain.classList.add('hidden');
+    }
+  });
+});
+
+// HSV Function 切換
+document.querySelectorAll('.hsv_block').forEach(block => {
+  const select    = block.querySelector('.hsv_func_select');
+  const paramSets = block.querySelectorAll('.hsv_func_params');
+
+  if (!select) return;
+
+  // func_number <-> func_range 
+  paramSets.forEach(set => {
+    const numbers = set.querySelectorAll('.func_number');
+
+    numbers.forEach(num => {
+      const paramName = num.dataset.param;
+      if (!paramName) return;
+
+      const range = set.querySelector(`.func_range[data-param="${paramName}"]`);
+      if (!range) return;
+
+      const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+      // number -> range
+      num.addEventListener('input', () => {
+        const min = Number(num.min ?? 0);
+        const max = Number(num.max ?? 255);
+        let v = Number(num.value || 0);
+        v = clamp(v, min, max);
+        num.value = v;
+        range.value = v;
+      });
+
+      // range -> number
+      range.addEventListener('input', () => {
+        num.value = range.value;
+      });
+    });
+  });
+
+  // 切換 function（Const / Ramp / Tri / Pulse / Step）
+  select.addEventListener('change', () => {
+    const func = select.value;
+
+    paramSets.forEach(set => {
+      const isActive = set.dataset.func === func;
+      set.classList.toggle('active', isActive);
+
+      if (isActive) {
+        const inputs = set.querySelectorAll('input');
+
+        inputs.forEach(inp => {
+          if (inp.type === 'checkbox' || inp.type === 'radio') {
+            inp.checked = inp.defaultChecked;
+          } else if (inp.defaultValue !== undefined && inp.defaultValue !== '') {
+            inp.value = inp.defaultValue;
+          } else if (inp.min !== undefined && inp.max !== undefined) {
+            inp.value = inp.min || 0;
+          }
+        });
+      }
+    });
+  });
+
+  select.dispatchEvent(new Event('change'));
+});
+
+// 額外參數 數字 <-> 滑桿 同步 
+
+document.querySelectorAll('.extra_group').forEach(group => {
+  const numbers = group.querySelectorAll('.param_number');
+
+  numbers.forEach(num => {
+    const row = num.closest('.param_input_row');
+    if (!row) return;
+    const range = row.querySelector('.param_range');
+    if (!range) return;
+
+    const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+
+    // number -> range
+    num.addEventListener('input', () => {
+      const min = Number(num.min ?? 0);
+      const max = Number(num.max ?? 255);
+      let v = Number(num.value || 0);
+      v = clamp(v, min, max);
+      num.value = v;
+      range.value = v;
+    });
+
+    // range -> number
+    range.addEventListener('input', () => {
+      num.value = range.value;
+    });
+  });
+});
+
+// 切換（參數 / 控制）
+document.querySelectorAll('.param_tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+
+    document.querySelectorAll('.param_tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+
+    document.querySelectorAll('.param_body').forEach(b => {
+      b.classList.toggle('active', b.classList.contains(`param_body--${mode}`));
+    });
+  });
+});
+
+const MODE_MAP = {
+  "清除": "MODES_CLEAR",
+  "純色": "MODES_PLAIN",
+  "方形": "MODES_SQUARE",
+  "鐮刀": "MODES_SICKLE",
+  "扇形": "MODES_FAN",
+  "方塊": "MODES_BOXES",
+  "DNA":  "MODES_CMAP_DNA",
+  "火焰": "MODES_CMAP_FIRE",
+};
+
+const FUNC_CODE = {
+  "none": 0,
+  "const": 1,
+  "ramp": 2,
+  "tri": 3,
+  "pulse": 4,
+  "step": 5
+};
+
+function to255(value, min, max) {
+  const v = Math.min(max, Math.max(min, Number(value) || 0));
+  return Math.round((v - min) / (max - min) * 255);
+}
+
+function sendToSettime(jsonPath) {
+  const currentPlaybackTime = 0; 
+
+  fetch('/settime', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      path: jsonPath,
+      current_time: currentPlaybackTime
+    })
+  })
+}
+
+// Audio / waveform state
 let audioCtx = null;
 let audioBuffer = null;
 let peaks = [];
-let animationId = null;
-let isDragging = false;
-let wasPlayingBeforeDrag = false;
+let audioDuration = 0;
+let waveformLines = [];
 
-// Format seconds → mm:ss
+// Fabric timeline state (工程時間系統)
+let timescale_canvas = null;
+let timelineOffset = 0; // seconds at left edge
+let secondsPerPixel = 1 / 100; // initial: 1px = 0.01s
+const minZoom = 1 / 500;
+const maxZoom = 1 / 3;
+
+let waveformObj = null;      // fabric.Image for waveform clip
+let waveformImgURL = null;   // blob/dataURL
+let clipStartSec = 0;        // clip start time in timeline seconds
+let clipWidthPx = 0;         // width on screen in px for the clip (derived)
+let globalTime = 0;          // engine time in seconds
+let isPlaying = false;
+let rafId = null;
+let lastRAFTime = null;
+
+let playhead = null;
+
+////////////////////////////////////////////////////////////////////////////////
+// Helper utilities
+////////////////////////////////////////////////////////////////////////////////
 function fmt(t) {
   if (!isFinite(t)) return '00:00';
   const m = Math.floor(t / 60);
@@ -48,93 +288,462 @@ function fmt(t) {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-// 在分鐘或秒欄按 Enter 也能跳轉
-minInput.addEventListener("keydown", (ev) => {
-  // 按 Enter 時直接跳到秒數欄位
-  if (ev.key === "Enter") {
+////////////////////////////////////////////////////////////////////////////////
+// Timeline initialization
+////////////////////////////////////////////////////////////////////////////////
+function initTimelineFabric() {
+  timescale_canvas = new fabric.Canvas("timelineCanvas", {
+    selection: false,
+    renderOnAddRemove: false,
+    preserveObjectStacking: true
+  });
+
+  // ensure canvas size matches element size
+  timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
+  timescale_canvas.setHeight(timelineCanvasEl.clientHeight);
+
+  // timeline drag (panning) when clicking empty space
+  let isPanning = false;
+  let lastPanX = 0;
+// 🌟 新增變數：用於判斷是否發生拖曳
+  let isDraggingTimeline = false;
+  //let initialClickX = 0; // 記錄 mouse:down 時的 X 座標
+  //const DRAG_THRESHOLD = 5; // 判斷是否為拖曳的像素門檻
+  timescale_canvas.on('mouse:down', (e) => {
+    // if clicked an object, do nothing (object drag handlers will run)
+    if (e.target) return;
+    isPanning = true;
+    lastPanX = e.pointer.x;
+    // 🌟 記錄初始位置，並重設拖曳旗標
+    initialClickX = e.pointer.x;
+    isDraggingTimeline = false;
+  });
+
+  timescale_canvas.on('mouse:move', (e) => {
+    if (!isPanning) return;
+    const dx = e.pointer.x - lastPanX;
+    isDraggingTimeline = true;
+    lastPanX = e.pointer.x;
+    timelineOffset -= dx * secondsPerPixel;
+    if (timelineOffset < 0) timelineOffset = 0;
+    drawTimeline();
+  });
+
+  timescale_canvas.on('mouse:up', (e) => {
+    if (!isPanning) return;
+    // 🌟 關鍵修正：計算移動距離
+    //const movedDistance = Math.abs(e.pointer.x - initialClickX);
+    // 🌟 關鍵修正：檢查是否為點擊 (沒有發生拖曳)
+    // 且確保 e.target 為空 (沒有點擊到 waveformObj)
+    if (!isDraggingTimeline && !e.target) {
+        const p = e.pointer;
+        const clickedTime = timelineOffset + p.x * secondsPerPixel;
+        seekGlobal(clickedTime);
+    }
+    isPanning = false;
+    
+  });
+
+  // zoom with wheel - keep center time anchored
+  timescale_canvas.on('mouse:wheel', (opt) => {
+    const e = opt.e;
+    const wheelDelta = e.deltaY;
+    const rect = timelineCanvasEl.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left; // canvas coordinates
+
+    const centerTime = timelineOffset + offsetX * secondsPerPixel;
+
+    if (wheelDelta < 0) secondsPerPixel *= 0.9;
+    else secondsPerPixel *= 1.1;
+
+    secondsPerPixel = Math.max(minZoom, Math.min(maxZoom, secondsPerPixel));
+
+    // keep same centerTime
+    timelineOffset = centerTime - offsetX * secondsPerPixel;
+    if (timelineOffset < 0) timelineOffset = 0;
+
+    drawTimeline();
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+
+  // create playhead (visual only)
+  playhead = new fabric.Line([0, 0, 0, timescale_canvas.getHeight()], {
+    stroke: 'red',
+    strokeWidth: 2,
+    selectable: false,
+    evented: false
+  });
+  timescale_canvas.add(playhead);
+
+  drawTimeline();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Draw timeline: ticks, labels, waveformObj (if present), playhead
+////////////////////////////////////////////////////////////////////////////////
+function drawTimeline() {
+  if (!timescale_canvas) return;
+  const canvas = timescale_canvas;
+  const w = canvas.getWidth();
+  const h = canvas.getHeight();
+
+  canvas.clear();
+
+  // baseline
+  const baseY = Math.floor(h * 0.6);
+  canvas.add(new fabric.Line([0, 60, w, 60], {
+    stroke: '#ffffff', strokeWidth: 2, selectable: false, evented: false
+  }));
+
+  // determine tick spacing
+  let majorTick = 1;
+  if (secondsPerPixel < 1 / 800) majorTick = 0.5;
+  if (secondsPerPixel < 1 / 1500) majorTick = 0.2;
+  if (secondsPerPixel > 1 / 40) majorTick = 5;
+  if (secondsPerPixel > 1 / 20) majorTick = 10;
+  if (secondsPerPixel > 1 / 10) majorTick = 30;
+  if (secondsPerPixel > 1 / 5) majorTick = 60;
+
+  const startSec = timelineOffset;
+  const endSec = timelineOffset + w * secondsPerPixel;
+  let firstTick = Math.ceil(startSec / majorTick) * majorTick;
+
+  for (let t = firstTick; t <= endSec; t += majorTick) {
+    const x = (t - timelineOffset) / secondsPerPixel;
+    canvas.add(new fabric.Line([x, 40, x, 60], {
+      stroke: '#ffffff', strokeWidth: 1, selectable: false, evented: false
+    }));
+
+    const mm = String(Math.floor(Math.abs(t) / 60)).padStart(2, '0');
+    const ss = String(Math.floor(Math.abs(t) % 60)).padStart(2, '0');
+    const labelText = (t < 0 ? '-' : '') + `${mm}:${ss}`;
+
+    canvas.add(new fabric.Text(labelText, {
+      left: x + 3, top: 6, fill: '#ffffff', fontSize: 12,
+      selectable: false, evented: false
+    }));
+  }
+
+  // add waveform object if exists
+  if (waveformObj && audioBuffer) {
+    updateWaveformScaleAndPos(); // ensure scale/left are correct for current zoom/offset
+    canvas.add(waveformObj);
+
+      timescale_canvas.add(waveformObj);
+      
+      // 依序將線段加入畫布
+      waveformLines.forEach(line => timescale_canvas.add(line));
+  }
+  // add playhead on top
+  updatePlayheadVisual();
+  canvas.add(playhead);
+
+  canvas.requestRenderAll();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Create waveform image from peaks and add as Fabric image (clip)
+////////////////////////////////////////////////////////////////////////////////
+async function createWaveformImageAndAddToTimeline() {
+  if (!audioBuffer || !timescale_canvas) return;
+
+  // create a large base image width (e.g., px per second base)
+  const basePxPerSec = 200; // tune: larger = more detailed waveform image
+  const baseWidth = Math.max(2000, Math.floor(audioBuffer.duration * basePxPerSec));
+  const height = 95;
+
+  const cv = document.createElement('canvas');
+  cv.width = baseWidth;
+  cv.height = height;
+  const c = cv.getContext('2d');
+
+  // background
+  c.fillStyle = "#0d1117";
+  c.fillRect(0, 0, baseWidth, height);
+
+  // draw peaks
+  const mid = height / 2;
+  c.strokeStyle = "#4fb3d6";
+  c.lineWidth = 1;
+  c.beginPath();
+
+  for (let x = 0; x < baseWidth; x++) {
+    const idx = Math.floor(x * (peaks.length / baseWidth));
+    const p = peaks[idx] || 0;
+    const y = p * (height / 2);
+    c.moveTo(x + 0.5, mid - y);
+    c.lineTo(x + 0.5, mid + y);
+  }
+  c.stroke();
+
+  // convert to dataURL
+  waveformImgURL = cv.toDataURL();
+
+  // remove old waveformObj
+  if (waveformObj) {
+    timescale_canvas.remove(waveformObj);
+    waveformObj = null;
+  }
+
+  return new Promise((resolve) => {
+    fabric.Image.fromURL(waveformImgURL, (img) => {
+      waveformObj = img;
+      waveformObj.set({
+        left: 0,
+        top: 110,
+        originY: 'center',
+        selectable: true,
+        hasControls: false,
+        hasBorders: false,
+        hoverCursor: 'grab'
+      });
+
+
+      // make sure user can only drag horizontally
+    waveformObj.on('moving', () => {
+    waveformObj.top = 110;
+
+    // 計算 clipStartSec（尚未 clamp）
+    let newClipStart = timelineOffset + waveformObj.left * secondsPerPixel;
+
+    // ❗ 若小於 0 → 強制回到 0
+    if (newClipStart < 0) {
+        newClipStart = 0;
+        waveformObj.left = (0 - timelineOffset) / secondsPerPixel;
+    }
+
+    clipStartSec = newClipStart;
+
+    ensureAudioSyncToGlobal(true);
+    updateTimeUI();
+    // 🎯 修正點 3: 同步三條線段的位置 (只需同步 left)
+    waveformLines.forEach((line,index) => {
+        if (index === 1) { // 🌟 右側框線 (index=1)
+            // 右框線位置 = 波形圖起始位置 + 拉伸後的寬度
+            line.left = waveformObj.left + clipWidthPx;
+        } else {
+            // 左側 (index=0) 和底部 (index=2) 框線
+            line.left = waveformObj.left;
+        }
+        line.setCoords();
+    });
+    timescale_canvas.requestRenderAll();
+});
+
+
+      // initial scale & position
+      updateWaveformScaleAndPos();
+      // 🎯 修正點 2-2: 在此處創建三條線段 (左、右、底)
+    waveformLines = []; // 清空舊的線段
+    const strokeOpts = {
+      stroke: '#ffffff',
+      strokeWidth: 2,
+      selectable: false,
+      evented: false
+    };
+    const topY = 110 - img.height / 2; // top 屬性是 110
+    const bottomY = 110 + img.height / 2;
+    const height = img.height;
+    const width = img.width;
+
+    // 1. 左側框線: 
+    const leftLine = new fabric.Line([0, topY, 0, bottomY], strokeOpts);
+    leftLine.set({ originY: 'center', top: 110 });
+
+    // 2. 右側框線:
+    const rightLine = new fabric.Line([width, topY, width, bottomY], strokeOpts);
+    rightLine.set({ originY: 'center', top: 110 });
+
+    // 3. 底部框線: (使用相對座標 [0, 0] 到 [width, 0], 然後用 top 定位在 bottomY)
+    const bottomLine = new fabric.Line([0, 0, width, 0], strokeOpts);
+    bottomLine.set({ originY: 'center', top: bottomY });
+
+
+    waveformLines.push(leftLine, rightLine, bottomLine);
+    
+    // 依序將線段加入畫布
+    waveformLines.forEach(line => timescale_canvas.add(line));
+      timescale_canvas.add(waveformObj);
+      timescale_canvas.requestRenderAll();
+      resolve();
+    });
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Update waveform scale based on secondsPerPixel and clipStartSec -> position left
+////////////////////////////////////////////////////////////////////////////////
+function updateWaveformScaleAndPos() {
+  if (!waveformObj || !audioBuffer || !timescale_canvas) return;
+
+  const totalSec = audioBuffer.duration;
+  audioDuration = totalSec;
+
+  // compute width in px for the clip on the timeline (totalSec / secondsPerPixel)
+  const totalWidthPx = totalSec / secondsPerPixel;
+  const naturalW = waveformObj.width || 1;
+  waveformObj.scaleX = totalWidthPx / naturalW;
+  waveformObj.scaleY = 1;
+
+  clipWidthPx = totalWidthPx;
+
+  // left position = (clipStartSec - timelineOffset)/secondsPerPixel
+  waveformObj.left = (clipStartSec - timelineOffset) / secondsPerPixel;
+// 🎯 同步線段的位置與縮放
+  waveformLines.forEach((line, index) => {
+      line.left = waveformObj.left;
+      
+      // 底部線段 (index=2) 繼承縮放
+      if (index === 2) {
+          line.scaleX = waveformObj.scaleX; 
+      }
+      else if (index === 1) { // 🌟 新增：針對右框線
+          // 右框線的位置 = 波形圖起始位置 + 拉伸後的總寬度
+          line.left = waveformObj.left + clipWidthPx;
+          line.scaleX = 1; // 保持固定厚度 
+      }
+      else {
+          // 左右框線保持自然寬度
+          line.scaleX = 1; 
+      }
+      
+  });
+ // ❗ clipStartSec 不可小於 0
+if (clipStartSec < 0) clipStartSec = 0;
+
+  // ensure left within reasonable bounds
+  const canvasW = timescale_canvas.getWidth();
+  if (waveformObj.left < -clipWidthPx) waveformObj.left = -clipWidthPx;
+  if (waveformObj.left > canvasW) waveformObj.left = canvasW;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Global play control (engine) - RAF tick advances globalTime
+////////////////////////////////////////////////////////////////////////////////
+function playGlobal() {
+  if (!audioBuffer) return;
+  if (!isPlaying) {
+    isPlaying = true;
+    lastRAFTime = performance.now();
+    rafTick(lastRAFTime);
+    playToggle.textContent = "⏸ 暫停";
+  }
+}
+function pauseGlobal() {
+  isPlaying = false;
+  playToggle.textContent = "▶ 播放";
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  // pause audio as well
+  if (!audio.paused) audio.pause();
+}
+
+function rafTick(now) {
+  rafId = requestAnimationFrame(rafTick);
+  if (!lastRAFTime) lastRAFTime = now || performance.now();
+  const delta = ((now || performance.now()) - lastRAFTime) / 1000;
+  lastRAFTime = now || performance.now();
+
+  if (isPlaying) {
+    globalTime += delta;
+    if (globalTime < 0) globalTime = 0;
+
+    // sync audio to engine: only when in clip range
+    ensureAudioSyncToGlobal();
+    updateTimeUI();
+    updatePlayheadVisual();
+
+    // we render once per frame when playing
+    timescale_canvas.requestRenderAll();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Ensure audio playback is synced to globalTime and clip range (DAW logic)
+// immediate=true when called during dragging for immediate seek/play
+////////////////////////////////////////////////////////////////////////////////
+function ensureAudioSyncToGlobal(immediate = false) {
+  if (!audioBuffer) return;
+  const clipEnd = clipStartSec + audioBuffer.duration;
+  const inClip = globalTime >= clipStartSec && globalTime < clipEnd;
+
+  if (inClip) {
+    const targetAudioTime = globalTime - clipStartSec;
+    const diff = Math.abs((audio.currentTime || 0) - targetAudioTime);
+
+    // Need to seek/play?
+    if (audio.paused || diff > 0.08 || immediate) {
+      audio.currentTime = Math.min(Math.max(0, targetAudioTime), audioBuffer.duration - 0.001);
+      if (isPlaying) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        audio.play().catch(()=>{});
+      }
+    }
+  } else {
+    // outside clip -> pause audio
+    if (!audio.paused) audio.pause();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Update playhead visual position
+////////////////////////////////////////////////////////////////////////////////
+function updatePlayheadVisual() {
+  if (!playhead || !timescale_canvas) return;
+  const x = (globalTime - timelineOffset) / secondsPerPixel;
+  playhead.set({ x1: x, x2: x, y1: 0, y2: timescale_canvas.getHeight() });
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Seek globalTime (click on timeline or jump input)
+////////////////////////////////////////////////////////////////////////////////
+function seekGlobal(t) {
+  globalTime = Math.max(0, Math.min(t, 999999)); // cap very large values
+  ensureAudioSyncToGlobal();
+  updateTimeUI();
+  drawTimeline();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Time input jump handler
+////////////////////////////////////////////////////////////////////////////////
+function jumpToTimeFromInputs() {
+  const minutes = parseInt(minInput.value, 10) || 0;
+  const seconds = parseInt(secInput.value, 10) || 0;
+  if (seconds > 59) {
+    alert('秒數不可大於59');
+    return;
+  }
+  const total = minutes * 60 + seconds;
+  if (audioBuffer && total > (audioBuffer.duration + 100000)) {
+    // arbitrary large check; allow seeking outside for timeline though
+    alert('輸入時間超出合理範圍');
+    return;
+  }
+  seekGlobal(total);
+}
+
+minInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
     ev.preventDefault();
     secInput.focus();
   }
 });
-secInput.addEventListener("keydown", (ev) => {
-  // 在秒欄按 Enter 就跳轉到該時間
-  if (ev.key === "Enter") {
+secInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
     ev.preventDefault();
-    jumpToTime();
+    jumpToTimeFromInputs();
   }
 });
 
-function jumpToTime() {
-  const minutes = parseInt(minInput.value, 10) || 0;
-  const seconds = parseInt(secInput.value, 10) || 0;
-  const totalSeconds = minutes * 60 + seconds;
-
-  if (!audio.duration) return alert("請先載入音樂");
-  if (totalSeconds < 0 || totalSeconds > audio.duration) {
-    alert("輸入的時間超出音樂長度");
-    return;
-  }
-  if (seconds > 59){
-    alert("秒數不可大於59")
-    return;
-  }
-  audio.currentTime = totalSeconds;
-  drawWave(audio.currentTime / audio.duration);
-  timeLabel.textContent = `${fmt(audio.currentTime)} / ${fmt(audio.duration)}`;
-}
-
-// Draw waveform and playhead
-function drawWave(progress = 0) {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#07101a';
-  ctx.fillRect(0, 0, w, h);
-  const mid = h / 2;
-  const peakColor = '#4fb3d6';
-  const playedColor = '#dff6ff';
-
-  // all peaks
-  ctx.beginPath();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = peakColor;
-  for (let x = 0; x < w; x++) {
-    const idx = Math.floor(x * (peaks.length / w));
-    const p = peaks[idx] || 0;
-    const y = p * (h / 2);
-    ctx.moveTo(x + 0.5, mid - y);
-    ctx.lineTo(x + 0.5, mid + y);
-  }
-  ctx.stroke();
-
-  // played portion
-  if (progress > 0) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, w * progress, h);
-    ctx.clip();
-    ctx.strokeStyle = playedColor;
-    for (let x = 0; x < w; x++) {
-      const idx = Math.floor(x * (peaks.length / w));
-      const p = peaks[idx] || 0;
-      const y = p * (h / 2);
-      ctx.moveTo(x + 0.5, mid - y);
-      ctx.lineTo(x + 0.5, mid + y);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // playhead
-  const playX = w * progress;
-  ctx.beginPath();
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-  ctx.moveTo(playX, 0);
-  ctx.lineTo(playX, h);
-  ctx.stroke();
-}
-
-// compute waveform peaks
+////////////////////////////////////////////////////////////////////////////////
+// Compute peaks (same algorithm as before)
+////////////////////////////////////////////////////////////////////////////////
 function computePeaks(buffer, count = 2000) {
   const channelData = buffer.getChannelData(0);
   const samples = channelData.length;
@@ -153,486 +762,122 @@ function computePeaks(buffer, count = 2000) {
   return peaks;
 }
 
-// update progress animation
-function animate() {
-    if (!audioBuffer) return;
-    const duration = audio.duration;
-    const current = audio.currentTime;
-    const progress = Math.min(1, current / duration);
-    drawWave(progress);
-    timeLabel.textContent = `${fmt(current)} / ${fmt(duration)}`;
-    animationId = requestAnimationFrame(animate);
-}
+////////////////////////////////////////////////////////////////////////////////
+// File load and decode
+////////////////////////////////////////////////////////////////////////////////
+musicFileLoadBtn.addEventListener('click', () => fileInput.click());
 
-// convert clientX to playback progress (0–1)
-function clientXToProgress(x) {
-    const rect = canvas.getBoundingClientRect();
-    const offset = Math.min(rect.width, Math.max(0, x - rect.left));
-    return offset / rect.width;
-}
-
-// seek audio
-function seek(progress) {
-    if (!audioBuffer) return;
-    const duration = audio.duration;
-    const time = Math.min(duration, Math.max(0, progress * duration));
-    audio.currentTime = time;
-    drawWave(progress);
-    timeLabel.textContent = `${fmt(time)} / ${fmt(duration)}`;
-}
-
-// file load
-document.getElementById('music_file_load_Btn').addEventListener('click', () => {
-    document.getElementById('fileInput').click();
-});
 fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-    const url = URL.createObjectURL(file);
-    audio.src = url;
-    audio.load();
-    playToggle.disabled = false;
-    playToggle.textContent = "▶ 播放";
+  const url = URL.createObjectURL(file);
+  audio.src = url;
+  audio.load();
 
-    const buf = await file.arrayBuffer();
-    try {
-        audioBuffer = await audioCtx.decodeAudioData(buf.slice(0));
-    } catch {
-        audioBuffer = await new Promise((res, rej) => audioCtx.decodeAudioData(buf, res, rej));
-    }
-    const pixelWidth = canvas.width / (window.devicePixelRatio || 1);
-    peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(pixelWidth * 2)));                                                                                                                                                                                                  
-    /*peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(canvas.clientWidth * 2)));*/
-    drawWave(0);
-    timeLabel.textContent = `00:00 / ${fmt(audioBuffer.duration)}`;
-});
+  const buf = await file.arrayBuffer();
+  try {
+    audioBuffer = await audioCtx.decodeAudioData(buf.slice(0));
+  } catch (err) {
+    audioBuffer = await new Promise((res, rej) => audioCtx.decodeAudioData(buf, res, rej));
+  }
 
-// play / pause toggle
-playToggle.addEventListener('click', async () => {
-    if (!audio.src) return;
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
+  audioDuration = audioBuffer.duration;
+  peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(audioBuffer.duration * 100)));
 
-    if (audio.paused || audio.ended) {
-        await audio.play();
-        playToggle.textContent = "⏸ 暫停";
-        cancelAnimationFrame(animationId);
-        animate();
-    } 
-    else {
-        audio.pause();
-        playToggle.textContent = "▶ 播放";
-        cancelAnimationFrame(animationId);
-    }
-});
-// 停止鍵
-const stopBtn = document.getElementById("stopBtn");
+  // reset clip start to 0 and engine time to 0
+  clipStartSec = 0;
+  globalTime = 0;
 
-// 當音樂載入後才啟用停止鍵
-audio.addEventListener("loadeddata", () => {
+  // create waveform image & add to timeline
+  await createWaveformImageAndAddToTimeline();
+
+  playToggle.disabled = false;
   stopBtn.disabled = false;
+  updateTimeUI();
+  drawTimeline();
 });
 
-// 停止鍵功能
-stopBtn.addEventListener("click", () => {
-  if (!audio.src) return;
+////////////////////////////////////////////////////////////////////////////////
+// Play / Pause / Stop handlers
+////////////////////////////////////////////////////////////////////////////////
+playToggle.addEventListener('click', async () => {
+  if (!audioBuffer) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
 
-  // 停止播放
-  audio.pause();
-  audio.currentTime = 0;
-  cancelAnimationFrame(animationId);
+  if (!isPlaying) {
+    playGlobal();
+  } else {
+    pauseGlobal();
+  }
+});
 
-// 音量控制
-const volumeSlider = document.getElementById("volumeSlider");
-const volumeValue = document.getElementById("volumeValue");
+stopBtn.addEventListener('click', () => {
+  pauseGlobal();
+  globalTime = 0;
+  ensureAudioSyncToGlobal();
+  updateTimeUI();
+  drawTimeline();
+});
 
-// 初始音量
-audio.volume = 1;
-
-// 當滑桿改變時更新音量
-volumeSlider.addEventListener("input", () => {
+////////////////////////////////////////////////////////////////////////////////
+// Volume control
+////////////////////////////////////////////////////////////////////////////////
+volumeSlider.addEventListener('input', () => {
   const vol = volumeSlider.value / 100;
   audio.volume = vol;
   volumeValue.textContent = `${volumeSlider.value}%`;
 });
-  // 更新畫面與按鈕
-  drawWave(0);
-  timeLabel.textContent = `00:00 / ${fmt(audio.duration)}`;
-  playToggle.textContent = "▶ 播放";
-});
 
-// audio end
-audio.addEventListener('ended', () => {
-    cancelAnimationFrame(animationId);
-    drawWave(1);
-     playToggle.textContent = "▶ 播放";
-});
-
-// 拖曳時間軸
-let dragProgress = 0;
-let dragTarget = 0;
-let dragRAF = null;
-
-canvas.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault();
-    wasPlayingBeforeDrag = !audio.paused && !audio.ended;
-    if (wasPlayingBeforeDrag) audio.pause();
-    isDragging = true;
-    canvas.setPointerCapture(ev.pointerId);
-    dragTarget = dragProgress = clientXToProgress(ev.clientX);
-    cancelAnimationFrame(animationId);
-    smoothDragAnimate(); // 啟動平滑拖曳動畫
-});
-
-canvas.addEventListener('pointermove', (ev) => {
-    if (!isDragging) return;
-    ev.preventDefault();
-    dragTarget = clientXToProgress(ev.clientX);
-});
-
-canvas.addEventListener('pointerup', (ev) => {
-    if (!isDragging) return;
-    isDragging = false;
-    canvas.releasePointerCapture(ev.pointerId);
-
-    const p = clientXToProgress(ev.clientX);
-    audio.currentTime = (audio.duration) * p;
-    drawWave(p);
-
-    if (wasPlayingBeforeDrag) {
-            audio.play();
-            playToggle.textContent = "⏸ 暫停";
-            cancelAnimationFrame(animationId);
-            animate();
-    } 
-    else {
-        playToggle.textContent = "▶ 播放";
-    }
-});
-
-// 平滑拖曳動畫（使用插值避免卡頓）
-function smoothDragAnimate() {
-    if (!isDragging) return;
-    dragProgress += (dragTarget - dragProgress); // 插值過渡
-    drawWave(dragProgress);
-
-  // 若音樂時間已載入，邊拖曳邊更新播放時間（即時預覽）
-  if (audio.duration > 0) {
-    audio.currentTime = audio.duration * dragProgress;
-  }
-
-  dragRAF = requestAnimationFrame(smoothDragAnimate);
-}
-
-
-// click seek
-canvas.addEventListener('click', (ev) => {
-  if (isDragging) return;
-  const p = clientXToProgress(ev.clientX);
-  seek(p);
-});
-
-// resize redraw
+////////////////////////////////////////////////////////////////////////////////
+// Window resize: resize fabric canvas and redraw
+////////////////////////////////////////////////////////////////////////////////
 window.addEventListener('resize', () => {
-  resizeCanvasToDisplaySize(canvas);
-  if (audioBuffer) {
-    const progress = audio.currentTime / audio.duration;
-    drawWave(progress);
-  }
+  if (!timescale_canvas) return;
+  timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
+  timescale_canvas.setHeight(timelineCanvasEl.clientHeight);
+  drawTimeline();
 });
 
-// asset library
-// ========== 素材庫切換 ==========
-document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
-    tab.addEventListener('click', () => {
-        document.querySelectorAll('.Asset_library_header .tab')
-            .forEach(t => t.classList.remove('active'));
-        tab.classList.add('active');
-
-        const target = tab.dataset.tab;
-        document.querySelectorAll('.Asset_library_content')
-            .forEach(c => c.classList.remove('active'));
-        document.querySelector(`.Asset_library_content.${target}`).classList.add('active');
-    });
-});
-
-// ========== 素材庫點擊切換參數面板 ==========
-const assetItems = document.querySelectorAll('.Asset_library_content .Asset_item');
-const paramPanel = document.querySelector('.param_panel');
-const paramBlocks = document.querySelectorAll('.param_panel .param_block');
-const paramEmpty = document.querySelector('.param_panel .param_empty');
-const paramBodyParam = document.querySelector('.param_body--param');
-
-function resetParamBlock(block) {
-  if (!block) return;
-
-  // 重設所有 input
-  const inputs = block.querySelectorAll('input');
-  inputs.forEach(input => {
-    if (input.type === 'checkbox' || input.type === 'radio') {
-      input.checked = input.defaultChecked;
-    } else {
-      input.value = input.defaultValue;
-    }
-  });
+////////////////////////////////////////////////////////////////////////////////
+// Update time label UI
+////////////////////////////////////////////////////////////////////////////////
+function updateTimeUI() {
+  timeLabel.textContent = `${fmt(globalTime)} / ${audioDuration ? fmt(audioDuration) : '00:00'}`;
+  volumeValue.textContent = `${Math.round(audio.volume * 100)}%`;
 }
 
-assetItems.forEach(item => {
-  item.addEventListener('click', () => {
-    const name = item.textContent.trim();
 
-    // 左邊選中樣式
-    assetItems.forEach(i => i.classList.remove('active'));
-    item.classList.add('active');
 
-    // 空白提示隱藏
-    if (paramEmpty) {
-      paramEmpty.style.display = 'none';
-    }
+////////////////////////////////////////////////////////////////////////////////
+// Initialization
+////////////////////////////////////////////////////////////////////////////////
+function initAll() {
+  // UI defaults
+  playToggle.disabled = true;
+  stopBtn.disabled = true;
+  volumeValue.textContent = `${Math.round((volumeSlider.value || 100))}%`;
 
-    // 捲軸回到最上面
-    if (paramBodyParam) {
-      paramBodyParam.scrollTop = 0;
-    }
-
-    // 顯示對應的 param_block 並重設內容
-    let activeBlock = null;
-    paramBlocks.forEach(block => {
-      if (block.dataset.effect === name) {
-        block.classList.add('active');
-        activeBlock = block;
-      } else {
-        block.classList.remove('active');
-      }
-    });
-
-    if (activeBlock) {
-      resetParamBlock(activeBlock);
-    }
-  });
-});
-
-// ========== 數字框 slider 互相同步 ==========
-document.querySelectorAll('.param_field').forEach(field => {
-  const num = field.querySelector('.param_number');
-  const range = field.querySelector('.param_range');
-  if (!num || !range) return;
-
-  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-  num.addEventListener('input', () => {
-    const min = Number(num.min ?? 0);
-    const max = Number(num.max ?? 100);
-    let v = Number(num.value || 0);
-    v = clamp(v, min, max);
-    num.value = v;
-    range.value = v;
-  });
-
-  range.addEventListener('input', () => {
-    num.value = range.value;
-  });
-});
-
-// ========== 參數 / 控制 tab 切換 ==========
-const paramTabs = document.querySelectorAll('.param_header .param_tab');
-const paramBodies = document.querySelectorAll('.param_body');
-
-paramTabs.forEach(tab => {
-  tab.addEventListener('click', () => {
-    const mode = tab.dataset.mode; 
-
-    paramTabs.forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-
-    paramBodies.forEach(body => {
-      if (body.classList.contains('param_body--' + mode)) {
-        body.classList.add('active');
-      } else {
-        body.classList.remove('active');
-      }
-    });
-  });
-});
-
-// =============================
-// 無限可拖曳 + 可縮放 Timeline
-// =============================
-const { createApp, ref } = Vue;
-
-createApp({
-  setup() {
-    // 無限時間軸狀態
-    let timelineOffset = 0;          // 畫面左邊代表的「秒」
-    let secondsPerPixel = 1 / 100;   // 初始縮放比例：每 px = 0.01 秒
-    const minZoom = 1 / 500;        // 最放大 (px 越多, 時間越小)
-    const maxZoom = 1 /3;          // 最縮小 (px 越少, 時間越大)
-
-    // 拖曳參數
-    let isDragging = false;
-    let lastX = 0;
-
-    // 初始化 Canvas
-    const initCanvas = () => {
-      timescale_canvas = new fabric.Canvas("timelineCanvas", {
-        selection: false,
-      });
-
-      // 事件：拖曳
-      timescale_canvas.on("mouse:down", startDrag);
-      timescale_canvas.on("mouse:move", onDrag);
-      timescale_canvas.on("mouse:up", stopDrag);
-      timescale_canvas.on("mouse:out", stopDrag);
-
-      // 事件：滑鼠滾輪縮放
-      timescale_canvas.on("mouse:wheel", onWheel);
-
-      drawTimeline();
-    };
-
-    // 滑鼠拖曳邏輯
-    const startDrag = (e) => {
-      isDragging = true;
-      lastX = e.pointer.x;
-    };
-
-    const stopDrag = () => {
-      isDragging = false;
-    };
-
-    const onDrag = (e) => {
-      if (!isDragging) return;
-
-      const dx = e.pointer.x - lastX;
-      lastX = e.pointer.x;
-
-      // 拖動時更改 offset
-      timelineOffset -= dx * secondsPerPixel;
-      if(timelineOffset <= 0){
-        timelineOffset = 0;
-      }
-      drawTimeline();
-    };
-
-    // 縮放（滑鼠滾輪）
-    const onWheel = (opt) => {
-      const delta = opt.e.deltaY;
-
-      if (delta < 0) {
-        // 放大
-        secondsPerPixel *= 0.9;
-      } else {
-        // 縮小
-        secondsPerPixel *= 1.1;
-      }
-
-      // 限制縮放範圍
-      secondsPerPixel = Math.min(maxZoom, Math.max(minZoom, secondsPerPixel));
-
-      drawTimeline();
-
-      opt.e.preventDefault();
-      opt.e.stopPropagation();
-    };
-
-    // 🚀 核心：「無限時間軸」繪製
-const drawTimeline = () => {
-  const canvas = timescale_canvas;
-  const w = canvas.getWidth();
-  canvas.clear();
-
-  // 畫面可見的時間區間
-  const startSec = timelineOffset;
-  const endSec = timelineOffset + w * secondsPerPixel;
-
-  // 主線
-  canvas.add(
-    new fabric.Line([0, 60, w, 60], {
-      stroke: "#ffffff",
-      strokeWidth: 2,
-      selectable: false,
-    })
-  );
-
-  // 動態切換刻度密度
-  let majorTick = 1;
-  if (secondsPerPixel < 1 / 800) majorTick = 0.5;
-  if (secondsPerPixel < 1 / 1500) majorTick = 0.2;
-  if (secondsPerPixel > 1 / 40) majorTick = 5;
-  if (secondsPerPixel > 1 / 20) majorTick = 10;
-  if (secondsPerPixel > 1 / 10) majorTick = 30;
-  if (secondsPerPixel > 1 / 5) majorTick = 60;
-  // 🔥 讓刻度永遠從『整除 majorTick』的時間開始
-  let firstTick = Math.ceil(startSec / majorTick) * majorTick;
-
-  // 畫刻度
-  for (let t = firstTick; t <= endSec; t += majorTick) {
-    const x = (t - timelineOffset) / secondsPerPixel;
-
-    // 線
-    canvas.add(
-      new fabric.Line([x, 40, x, 60], {
-        stroke: "#ffffff",
-        strokeWidth: 1,
-        selectable: false,
-      })
-    );
-
-    // 格式化 mm:ss
-    const abs = Math.abs(t);
-    const mm = String(Math.floor(abs / 60)).padStart(2, "0");
-    const ss = String(Math.floor(abs % 60)).padStart(2, "0");
-    const prefix = t < 0 ? "-" : "";
-
-    canvas.add(
-      new fabric.Text(`${prefix}${mm}:${ss}`, {
-        left: x + 3,
-        top: 5,
-        fill: "#ffffff",
-        fontSize: 12,
-        selectable: false,
-      })
-    );
+  // timeline init
+  if (!timelineCanvasEl) {
+    console.error('找不到 #timelineCanvas');
+    return;
   }
-};
+  timelineCanvasEl.width = timelineCanvasEl.clientWidth;
+  timelineCanvasEl.height = timelineCanvasEl.clientHeight;
 
+  initTimelineFabric();
 
-    // =============================
-    // Marker（可拖曳）
-    // =============================
-    const addMarker = () => {
-      const marker = new fabric.Triangle({
-        width: 14,
-        height: 14,
-        fill: "red",
-        left: 0,
-        top: 40,
-        originX: "center",
-        originY: "bottom",
-        hasControls: false,
-      });
+  // set initial audio volume
+  audio.volume = (volumeSlider.value || 100) / 100;
 
-      marker.on("moving", () => {
-        marker.top = 40; // 鎖 Y
+  updateTimeUI();
+}
 
-        // 限制拖曳邊界（以目前視窗參考）
-        const w = timescale_canvas.getWidth();
-        if (marker.left < 0) marker.left = 0;
-        if (marker.left > w) marker.left = w;
-      });
+// start
+initAll();
 
-      timescale_canvas.add(marker);
-    };
-
-    // =============================
-    // 初始化
-    // =============================
-    setTimeout(initCanvas);
-
-    return { addMarker };
-  }
-}).mount("#app");

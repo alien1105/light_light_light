@@ -36,7 +36,6 @@ body {
     grid-template-columns: 260px minmax(0, 1fr) 320px;
     column-gap: 20px;
 }
-
 /* 效果預覽區 */
 
 
@@ -110,155 +109,231 @@ body {
     text-align: center;
 }
 
+
+
 /* ========== 右側參數面板 ========== */
 
+/* 右側參數 / 控制面板外框 */
 .param_panel {
-    background: #1c1c1c;
-    border-left: 1px solid #333;
-    border-radius: 8px;
-    padding: 10px 12px;
-    color: #eee;
-    font-size: 14px;
+  background: #1c1c1c;
+  border-left: 1px solid #333;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #eee;
+  font-size: 14px;
 
-    height: 100%;
-    max-height: 100%;
-
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; 
+  height: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
+/* 上方 tab 列：參數 / 控制 */
 .param_header {
-    flex: 0 0 auto;
-    display: flex;
-    gap: 6px;
-    margin-bottom: 8px;
+  flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .param_tab {
-    flex: 1;
-    padding: 6px 0;
-    border-radius: 6px;
-    border: 1px solid #3a3a3a;
-    background: #2a2a2a;
-    color: #ddd;
-    cursor: pointer;
-    font-size: 13px;
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 6px;
+  border: 1px solid #3a3a3a;
+  background: #2a2a2a;
+  color: #ddd;
+  cursor: pointer;
+  font-size: 13px;
 }
 
 .param_tab.active {
-    background: #3e4a52;
-    color: #fff;
-    border-color: #4a5a66;
+  background: #3e4a52;
+  color: #fff;
+  border-color: #4a5a66;
 }
 
-.param_block {
-    display: none;
-}
-
-.param_block.active {
-    display: block;
-}
-
+/* 面板內容區：參數 / 控制 */
 .param_body {
-    flex: 1 1 auto;
-    overflow-y: auto;
-    display: none;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  display: none;
 }
 
 .param_body.active {
-    display: block;
+  display: block;
 }
 
+/* 什麼都沒選時的提示文字 */
+.param_empty {
+  font-size: 13px;
+  color: #aaa;
+}
+
+/* 主要參數內容 */
+.param_main.hidden {
+  display: none;
+}
+
+/* 一般 group 樣式 */
 .param_group {
-    margin-bottom: 16px;
-    padding: 8px 6px;
-    border-radius: 6px;
-    background: #242424;
+  margin-bottom: 12px;
+  padding: 8px 8px;
+  border-radius: 6px;
+  background: #242424;
 }
 
 .param_group_title {
-    font-size: 13px;
-    margin-bottom: 6px;
-    color: #d0eaff;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: #d0eaff;
 }
 
 .param_label_row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
 .param_label {
-    font-size: 14px;
+  font-size: 14px;
 }
 
-.color_preview {
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    cursor: pointer;
-}
-
-/* 數字+ slide*/
+/* label + (number + range) */
 .param_field {
-    margin-bottom: 8px;
+  margin-bottom: 8px;
 }
 
 .param_field label {
-    display: block;
-    margin-bottom: 2px;
-    font-size: 13px;
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
 }
 
 .param_input_row {
-    display: flex;
-    gap: 6px;
-    align-items: center;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .param_input_row input[type="number"] {
-    width: 70px;
-    padding: 3px 4px;
-    border-radius: 4px;
-    border: 1px solid #444;
-    background: #111;
-    color: #eee;
+  width: 80px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
 }
 
 .param_input_row input[type="range"] {
-    flex: 1;
+  flex: 1;
+}
+
+/* 額外幾何 group（扇葉、長度、曲度）預設不顯示，JS 控制 */
+.extra_group {
+  display: none;
+}
+
+/* 顏色小方塊 */
+.color_preview {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 下方提示文字 */
+.param_hint {
+  font-size: 13px;
+  color: #bbb;
+}
+
+/* HSV Function Block */
+.hsv_block {
+  margin-bottom: 12px;
+  padding: 8px 8px;
+  border-radius: 6px;
+  background: #202020;
+}
+
+.hsv_block .param_group_title {
+  margin-bottom: 4px;
+}
+
+/* Function 選擇下拉 */
+.hsv_func_select {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
+  font-size: 13px;
+}
+
+/* 各 function 對應的參數集 */
+.hsv_func_params {
+  display: none;
+  margin-top: 6px;
+}
+
+.hsv_func_params.active {
+  display: block;
+}
+
+/* 比較緊湊的 field（range / lower / upper / ...） */
+.param_field.compact {
+  margin-bottom: 6px;
+}
+
+.param_field.compact .param_input_row input[type="number"] {
+  width: 70px;
+}
+
+/* number + range 共用樣式 */
+.func_number {
+  width: 80px;
+  padding: 3px 4px;
+  border-radius: 4px;
+  border: 1px solid #444;
+  background: #111;
+  color: #eee;
+}
+
+.func_range {
+  flex: 1;
 }
 
 /* 加入自訂義按鈕 */
-
 .btn_add_custom {
-    width: 100%;
-    margin-top: 4px;
-    padding: 6px 0;
-    border-radius: 6px;
-    border: 1px solid #486a8c;
-    background: #264563;
-    color: #dff6ff;
-    cursor: pointer;
-    font-size: 13px;
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 0;
+  border-radius: 6px;
+  border: 1px solid #486a8c;
+  background: #264563;
+  color: #dff6ff;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.btn_add_custom:hover {
+  background: #30587a;
 }
 
 .btn_add_custom:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  opacity: 0.5;
+  cursor: not-allowed;
 }
-
 /* 左邊素材選中狀態 */
 
 .Asset_item.active {
     outline: 2px solid #4fb3d6;
 }
-
-/* 右側控制面板 */
 
 
 /* 音樂控制區 */
