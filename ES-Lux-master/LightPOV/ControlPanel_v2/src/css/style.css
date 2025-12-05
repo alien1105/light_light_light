@@ -330,6 +330,41 @@ body {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.custom_actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.btn_update_custom,
+.btn_delete_custom {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 6px;
+  border: 1px solid #486a8c;
+  background: #1f3448;
+  color: #dff6ff;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.btn_delete_custom {
+  border-color: #8c4848;
+  background: #462626;
+}
+
+.btn_update_custom:hover:not(:disabled),
+.btn_delete_custom:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.btn_update_custom:disabled,
+.btn_delete_custom:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* 左邊素材選中狀態 */
 
 .Asset_item.active {
