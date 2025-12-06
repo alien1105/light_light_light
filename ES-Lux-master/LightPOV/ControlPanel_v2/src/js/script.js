@@ -439,7 +439,7 @@ function drawTimeline() {
   // add playhead on top
   updatePlayheadVisual();
   canvas.add(playhead);
-
+  updateAssetPositions();
   canvas.requestRenderAll();
 }
 
@@ -887,6 +887,24 @@ function initAsset1Fabric() {
   asset_canvas1.requestRenderAll();
 }
 
+// 🔄 核心同步函式：根據時間軸的 Offset 和 Zoom 更新素材位置
+function updateAssetPositions() {
+  if (!asset_canvas1) return;
+
+  asset_canvas1.getObjects().forEach(obj => {
+    // 只有當物件有記錄 startTime 時才處理
+    if (obj.startTime !== undefined) {
+      // 公式：(物件開始時間 - 時間軸起始時間) / 每像素代表秒數
+      const newLeft = (obj.startTime - timelineOffset) / secondsPerPixel;
+      
+      obj.left = newLeft;
+      obj.setCoords(); // 更新物件的控制點座標
+    }
+  });
+
+  asset_canvas1.requestRenderAll();
+}
+
 function createAssetOnCanvas(assetName, x, y) {
     if (!asset_canvas1) return;
 
@@ -953,24 +971,102 @@ function createAssetOnCanvas(assetName, x, y) {
         tr: false, // 右上
         mtr: false // 旋轉控制點
     });
-    group.on('scaling', () => {
-        // 取得群組當前的縮放比例
-        const scaleX = group.scaleX;
-        const scaleY = group.scaleY; // 雖然我們鎖定了 Y，但寫著比較保險
+    // 輔助函式：取得目前這個方塊「左右兩邊的邊界限制」
+    function getSafeBoundaries(activeObj) {
+        let minX = 0; // 最左邊界 (畫布邊緣)
+        let maxX = asset_canvas1.getWidth(); // 最右邊界 (畫布邊緣)
 
-        // 將文字的縮放設為群組的「倒數」
-        // 例如：群組拉寬 2 倍，文字就設為 0.5 (1/2)，相乘後視覺效果為 1
-        textObj.set({
-            scaleX: 1 / scaleX,
-            scaleY: 1 / scaleY
+        const activeHalfWidth = (activeObj.width * activeObj.scaleX) / 2;
+        const activeLeftEdge = activeObj.left - activeHalfWidth;
+        const activeRightEdge = activeObj.left + activeHalfWidth;
+
+        asset_canvas1.getObjects().forEach(other => {
+            if (other === activeObj) return; // 跳過自己
+
+            const otherHalfWidth = (other.width * other.scaleX) / 2;
+            const otherLeftEdge = other.left - otherHalfWidth;
+            const otherRightEdge = other.left + otherHalfWidth;
+
+            // 判斷 other 是否在 activeObj 的左邊
+            // 邏輯：如果 other 的中心點在 active 的左邊，我們就視為左側障礙物
+            if (other.left < activeObj.left) {
+                // 找出最靠近 activeObj 的左邊界 (取最大值)
+                if (otherRightEdge > minX) minX = otherRightEdge;
+            }
+            
+            // 判斷 other 是否在 activeObj 的右邊
+            if (other.left > activeObj.left) {
+                // 找出最靠近 activeObj 的右邊界 (取最小值)
+                if (otherLeftEdge < maxX) maxX = otherLeftEdge;
+            }
         });
+
+        return { minX, maxX };
+    }
+
+    // 初始時間計算
+    group.startTime = timelineOffset + (x * secondsPerPixel);
+
+    // -------------------------------------------------------------
+    // 1. 移動時的防重疊
+    // -------------------------------------------------------------
+    group.on('moving', () => {
+        const bounds = getSafeBoundaries(group);
+        const halfWidth = (group.width * group.scaleX) / 2;
+
+        // 限制左邊：不能超過左側物件的右邊緣
+        if (group.left - halfWidth < bounds.minX) {
+            group.left = bounds.minX + halfWidth;
+        }
+        
+        // 限制右邊：不能超過右側物件的左邊緣
+        if (group.left + halfWidth > bounds.maxX) {
+            group.left = bounds.maxX - halfWidth;
+        }
+
+        // 同步時間 (在位置修正後才計算)
+        group.startTime = timelineOffset + (group.left * secondsPerPixel);
+    });
+
+    // -------------------------------------------------------------
+    // 2. 縮放時的防重疊
+    // -------------------------------------------------------------
+    group.on('scaling', () => {
+        const bounds = getSafeBoundaries(group);
+        const halfWidth = (group.width * group.scaleX) / 2;
+
+        // 文字抗拉伸
+        textObj.set({
+            scaleX: 1 / group.scaleX,
+            scaleY: 1 / group.scaleY
+        });
+
+        // 檢查是否碰到左邊界
+        if (group.left - halfWidth < bounds.minX) {
+            // 如果碰到，計算允許的最大寬度
+            // 最大寬度 = (中心點 - 左邊界) * 2
+            const maxAllowedWidth = (group.left - bounds.minX) * 2;
+            // 反推 ScaleX = 最大寬度 / 原始寬度
+            group.scaleX = maxAllowedWidth / group.width;
+            
+            // 修正位置 (避免微小誤差導致穿越)
+            group.left = bounds.minX + (group.width * group.scaleX) / 2;
+        }
+
+        // 檢查是否碰到右邊界
+        if (group.left + halfWidth > bounds.maxX) {
+            const maxAllowedWidth = (bounds.maxX - group.left) * 2;
+            group.scaleX = maxAllowedWidth / group.width;
+            group.left = bounds.maxX - (group.width * group.scaleX) / 2;
+        }
+
+        // 同步時間
+        group.startTime = timelineOffset + (group.left * secondsPerPixel);
     });
 
     asset_canvas1.add(group);
     asset_canvas1.setActiveObject(group); 
     asset_canvas1.requestRenderAll();
-    
-    console.log(`成功放置素材: ${assetName}，已設定僅限水平縮放`);
 }
 
 // Initialization
