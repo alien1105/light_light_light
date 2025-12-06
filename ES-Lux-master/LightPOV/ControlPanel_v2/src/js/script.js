@@ -1068,7 +1068,35 @@ function createAssetOnCanvas(assetName, x, y) {
     asset_canvas1.setActiveObject(group); 
     asset_canvas1.requestRenderAll();
 }
+//delete功能
+window.addEventListener('keydown', (e) => {
+    // 1. 檢查按鍵是否為 Delete 或 Backspace (Mac 有時是 Backspace)
+    if (e.key === 'Delete') {
+        
+        // 2. 安全檢查：如果使用者正在輸入框 (input) 或文字區域打字，忽略刪除指令
+        if (document.activeElement.tagName === 'INPUT' || 
+            document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
 
+        if (!asset_canvas1) return;
+
+        // 3. 取得目前選取的物件 (getActiveObjects 支援單選與多選)
+        const activeObjects = asset_canvas1.getActiveObjects();
+
+        if (activeObjects.length) {
+            // 清除目前的選取框，避免刪除後殘留藍色框線
+            asset_canvas1.discardActiveObject();
+
+            // 4. 遍歷並移除所有選取的物件
+            activeObjects.forEach((obj) => {
+                asset_canvas1.remove(obj);
+            });
+
+            asset_canvas1.requestRenderAll();
+        }
+    }
+});
 // Initialization
 function initAll() {
   // UI defaults
