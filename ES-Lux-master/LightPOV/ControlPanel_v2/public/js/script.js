@@ -27,7 +27,7 @@ const volumeSlider = document.getElementById('volumeSlider');
 const volumeValue = document.getElementById('volumeValue');
 
 const timelineCanvasEl = document.getElementById('timelineCanvas');
-
+const assetCanvas1El = document.getElementById('assetCanvas1');
 // asset library
 document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -278,9 +278,7 @@ let lastRAFTime = null;
 
 let playhead = null;
 
-////////////////////////////////////////////////////////////////////////////////
 // Helper utilities
-////////////////////////////////////////////////////////////////////////////////
 function fmt(t) {
   if (!isFinite(t)) return '00:00';
   const m = Math.floor(t / 60);
@@ -288,9 +286,7 @@ function fmt(t) {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Timeline initialization
-////////////////////////////////////////////////////////////////////////////////
 function initTimelineFabric() {
   timescale_canvas = new fabric.Canvas("timelineCanvas", {
     selection: false,
@@ -380,9 +376,7 @@ function initTimelineFabric() {
   drawTimeline();
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Draw timeline: ticks, labels, waveformObj (if present), playhead
-////////////////////////////////////////////////////////////////////////////////
 function drawTimeline() {
   if (!timescale_canvas) return;
   const canvas = timescale_canvas;
@@ -443,9 +437,7 @@ function drawTimeline() {
   canvas.requestRenderAll();
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Create waveform image from peaks and add as Fabric image (clip)
-////////////////////////////////////////////////////////////////////////////////
 async function createWaveformImageAndAddToTimeline() {
   if (!audioBuffer || !timescale_canvas) return;
 
@@ -572,9 +564,7 @@ async function createWaveformImageAndAddToTimeline() {
   });
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Update waveform scale based on secondsPerPixel and clipStartSec -> position left
-////////////////////////////////////////////////////////////////////////////////
 function updateWaveformScaleAndPos() {
   if (!waveformObj || !audioBuffer || !timescale_canvas) return;
 
@@ -619,9 +609,7 @@ if (clipStartSec < 0) clipStartSec = 0;
   if (waveformObj.left > canvasW) waveformObj.left = canvasW;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Global play control (engine) - RAF tick advances globalTime
-////////////////////////////////////////////////////////////////////////////////
 function playGlobal() {
   if (!audioBuffer) return;
   if (!isPlaying) {
@@ -662,10 +650,8 @@ function rafTick(now) {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Ensure audio playback is synced to globalTime and clip range (DAW logic)
 // immediate=true when called during dragging for immediate seek/play
-////////////////////////////////////////////////////////////////////////////////
 function ensureAudioSyncToGlobal(immediate = false) {
   if (!audioBuffer) return;
   const clipEnd = clipStartSec + audioBuffer.duration;
@@ -690,18 +676,14 @@ function ensureAudioSyncToGlobal(immediate = false) {
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Update playhead visual position
-////////////////////////////////////////////////////////////////////////////////
 function updatePlayheadVisual() {
   if (!playhead || !timescale_canvas) return;
   const x = (globalTime - timelineOffset) / secondsPerPixel;
   playhead.set({ x1: x, x2: x, y1: 0, y2: timescale_canvas.getHeight() });
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Seek globalTime (click on timeline or jump input)
-////////////////////////////////////////////////////////////////////////////////
 function seekGlobal(t) {
   globalTime = Math.max(0, Math.min(t, 999999)); // cap very large values
   ensureAudioSyncToGlobal();
@@ -709,9 +691,7 @@ function seekGlobal(t) {
   drawTimeline();
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // Time input jump handler
-////////////////////////////////////////////////////////////////////////////////
 function jumpToTimeFromInputs() {
   const minutes = parseInt(minInput.value, 10) || 0;
   const seconds = parseInt(secInput.value, 10) || 0;
@@ -741,9 +721,7 @@ secInput.addEventListener('keydown', (ev) => {
   }
 });
 
-////////////////////////////////////////////////////////////////////////////////
 // Compute peaks (same algorithm as before)
-////////////////////////////////////////////////////////////////////////////////
 function computePeaks(buffer, count = 2000) {
   const channelData = buffer.getChannelData(0);
   const samples = channelData.length;
@@ -762,9 +740,7 @@ function computePeaks(buffer, count = 2000) {
   return peaks;
 }
 
-////////////////////////////////////////////////////////////////////////////////
 // File load and decode
-////////////////////////////////////////////////////////////////////////////////
 musicFileLoadBtn.addEventListener('click', () => fileInput.click());
 
 fileInput.addEventListener('change', async (e) => {
@@ -801,9 +777,7 @@ fileInput.addEventListener('change', async (e) => {
   drawTimeline();
 });
 
-////////////////////////////////////////////////////////////////////////////////
 // Play / Pause / Stop handlers
-////////////////////////////////////////////////////////////////////////////////
 playToggle.addEventListener('click', async () => {
   if (!audioBuffer) return;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -824,18 +798,14 @@ stopBtn.addEventListener('click', () => {
   drawTimeline();
 });
 
-////////////////////////////////////////////////////////////////////////////////
 // Volume control
-////////////////////////////////////////////////////////////////////////////////
 volumeSlider.addEventListener('input', () => {
   const vol = volumeSlider.value / 100;
   audio.volume = vol;
   volumeValue.textContent = `${volumeSlider.value}%`;
 });
 
-////////////////////////////////////////////////////////////////////////////////
 // Window resize: resize fabric canvas and redraw
-////////////////////////////////////////////////////////////////////////////////
 window.addEventListener('resize', () => {
   if (!timescale_canvas) return;
   timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
@@ -843,19 +813,36 @@ window.addEventListener('resize', () => {
   drawTimeline();
 });
 
-////////////////////////////////////////////////////////////////////////////////
-// Update time label UI
-////////////////////////////////////////////////////////////////////////////////
+// Update time label UI/
 function updateTimeUI() {
-  timeLabel.textContent = `${fmt(globalTime)} / ${audioDuration ? fmt(audioDuration) : '00:00'}`;
+  timeLabel.textContent = `${fmt(globalTime)} `;
   volumeValue.textContent = `${Math.round(audio.volume * 100)}%`;
 }
 
+// 初始化 Asset1 Canvas 的 Fabric 畫布
+function initAsset1Fabric() {
+  if (!assetCanvas1El) {
+    console.error('找不到 #assetCanvas');
+    return;
+  }
+  
+  // 確保畫布尺寸匹配元素尺寸（這裡使用 HTML 中設定的寬高 1200x400）
+  assetCanvasEl.width = assetCanvasEl.clientWidth;
+  assetCanvasEl.height = assetCanvasEl.clientHeight;
 
+  asset_canvas = new fabric.Canvas("assetCanvas", {
+    selection: true, // 允許選取畫布上的素材
+    renderOnAddRemove: true,
+    backgroundColor: '#333333' // 設定一個背景色以便區分
+  });
+  
+  // 設置初始尺寸 (使用 HTML 中定義的 1200x400 作為基準)
+  asset_canvas.setWidth(assetCanvasEl.clientWidth);
+  asset_canvas.setHeight(assetCanvasEl.clientHeight);
+  asset_canvas.requestRenderAll();
+}
 
-////////////////////////////////////////////////////////////////////////////////
 // Initialization
-////////////////////////////////////////////////////////////////////////////////
 function initAll() {
   // UI defaults
   playToggle.disabled = true;
@@ -871,9 +858,9 @@ function initAll() {
   timelineCanvasEl.height = timelineCanvasEl.clientHeight;
 
   initTimelineFabric();
-
+  initAssetFabric();
   // set initial audio volume
-  audio.volume = (volumeSlider.value || 100) / 100;
+  audio.volume = volumeSlider.value / 100;
 
   updateTimeUI();
 }

@@ -444,3 +444,13 @@ canvas {
 .canvas-container .upper-canvas {
     background: transparent !important;
 }
+#timelineCanvas {
+    border: 2px solid white;
+    padding: 5px;
+    border-radius: 4px;
+}
+#assetCanvas1 {
+    border: 2px solid white;
+    padding: 5px;
+    border-radius: 4px;
+}
