@@ -211,6 +211,37 @@ app.post('/settime', (req, res) => {
     //console.log(`Received time: ${time} ms`);
     res.status(200).send('Time updated');
 });
+
+app.post('/update_file', (req, res) => {
+    const newFile = req.body.file || req.body.path;
+    
+    // 檢查是否有提供檔案位置
+    if (!newFile) {
+        return res.status(400).send('Missing file parameter');
+    }
+    
+    // 檢查檔案是否存在
+    const filePath = "public/" + newFile;
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).send('File not found: ' + filePath);
+    }
+    
+    try {
+        // 更新 SONG 變數
+        SONG = newFile;
+        
+        // 重新讀取檔案並更新 EffectMapData 和 EffectMap
+        EffectMapData = fs.readFileSync(filePath);
+        EffectMap = JSON.parse(EffectMapData);
+        
+        console.log('File updated to: ' + SONG);
+        res.status(200).send('File updated successfully: ' + SONG);
+    } catch (err) {
+        console.error('Error updating file:', err);
+        res.status(500).send('Error updating file: ' + err.message);
+    }
+});
+
 console.log(`Listening on port:${port} `);
 app.listen(port);
 
