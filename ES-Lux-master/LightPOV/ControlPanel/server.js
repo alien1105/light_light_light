@@ -9,6 +9,7 @@ var light_state = new Array(NUM_OF_LUX).fill(0);
 var light_effect = new Array(NUM_OF_LUX).fill(0);
 var lux_mode = new Array(NUM_OF_LUX).fill(0);
 var light_reset = new Array(NUM_OF_LUX).fill(0);
+var light_stop = new Array(NUM_OF_LUX).fill(0);
 var EXE_MODE = 0 //0 auto 1 manual
 var SONG = "ESC.json"
 var Time = 0;
@@ -109,7 +110,7 @@ app.get("/esp_time", (req, res) => {
     var now = new Date();
     light_state[id] = now.getTime()
     light_effect[id] = req.query.effect
-    var mode =(light_reset[id]) ? "C" : ((EXE_MODE == 0) ? "A" : "M")
+    var mode =(light_reset[id]) ? "C" : (light_stop[id]) ? "P" : (EXE_MODE == 0) ? "A" : "M"
     res.send(mode + (Time).toString())
 })
 
@@ -167,6 +168,19 @@ app.get("/update_lux_reset", (req, res) => {
     // reset 已经是一个布尔值了，不需要再检查是否为有效数字
     light_reset[id] = reset;  // 更新数组中的值
     res.send("Lux " + id.toString() + " reset: " + reset);
+})
+app.get("/update_lux_stop", (req, res) => {
+    var id = parseInt(req.query.id);
+    var stop = req.query.stop === 'true'; // 将传递的字符串转换为布尔值
+
+    // 检查 id 是否为有效的数组索引
+    if (isNaN(id) || id < 0 || id >= NUM_OF_LUX) {
+        return res.status(400).send("Invalid ID");
+    }
+
+    // reset 已经是一个布尔值了，不需要再检查是否为有效数字
+    light_stop[id] = stop;  // 更新数组中的值
+    res.send("Lux " + id.toString() + " stop: " + stop);
 })
 
 app.post('/fileupload', function (req, res) {

@@ -66,7 +66,7 @@ void WIFI_HANDLE_CODE(void *pvParameters)
         if (millis() - last_check_time > START_TIME_CHECK_INTERVAL){
             Mode m;
             effect.buffer.peek(&m);
-            effect.setMusicTime( comm.check_start_time(LUX_ID, m.mode, &effect.force_start) );
+            effect.setMusicTime( comm.check_start_time(LUX_ID, m.mode, &effect.force_mode) );
             last_check_time = millis();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
