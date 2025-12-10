@@ -54,11 +54,24 @@ const EFFECT_CONFIG = {
   "扇形": { extras: ["bladeCount", "length", "curvature"] },
 };
 
+const MODE_EXTRAS = {
+  "MODES_CLEAR":      [],
+  "MODES_PLAIN":      [],
+  "MODES_SQUARE":     ["boxsize"],
+  "MODES_SICKLE":     ["position_fix", "length", "curvature"],
+  "MODES_FAN":        ["bladeCount", "length", "curvature"],
+  "MODES_BOXES":      ["boxsize", "space"],
+  "MODES_CMAP_DNA":   ["reverse", "space"],
+  "MODES_CMAP_FIRE":  ["space"]
+};
+
 const assetItems = document.querySelectorAll('.Asset_item');
 const paramEmpty = document.querySelector('.param_empty');
 const paramMain  = document.querySelector('.param_main');
 const paramBody  = document.querySelector('.param_body--param');
 const extraGroups = document.querySelectorAll('.extra_group');
+let currentCustomPresetId = null;   // 目前選中的自訂義 preset 的 _id
+let currentModeStr = "MODES_PLAIN";
 
 // Reset
 function resetAllParams() {
@@ -68,6 +81,8 @@ function resetAllParams() {
     else
       inp.value = inp.defaultValue;
   });
+
+
 
   // Reset HSV function
   paramMain.querySelectorAll('.hsv_block').forEach(block => {
@@ -81,12 +96,63 @@ function resetAllParams() {
   });
 }
 
+// 切換參數介面
+function switchEffectUI(name) {
+    // 1. 更新當前的模式字串 (供後續儲存使用)
+    currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
+
+    // 2. 顯示參數面板，隱藏空狀態
+    if (paramEmpty) paramEmpty.style.display = 'none';
+    if (paramMain) paramMain.classList.remove('hidden');
+
+    // 3. 根據 EFFECT_CONFIG 決定要顯示哪些額外參數 (Extra Groups)
+    const cfg = EFFECT_CONFIG[name] || { extras: [] };
+
+    if (extraGroups) {
+        extraGroups.forEach(g => {
+            const key = g.dataset.extra;
+            g.style.display = cfg.extras.includes(key) ? "block" : "none";
+        });
+    }
+
+    // 4. 特殊處理：如果是 "清除"，則隱藏面板
+    if (name === "清除") {
+        paramMain.classList.add('hidden');
+    }
+}
+
+// 抓取目前面板上所有輸入框的值 (只抓取「顯示中」的參數)
+function capturePanelParams() {
+    const params = {};
+    const inputs = document.querySelectorAll('.param_main input, .param_main select');
+    
+    inputs.forEach(el => {
+        const key = el.id || el.dataset.param;
+        if (!key) return;
+
+        // 🛑 核心修正：過濾掉隱藏的 HSV 參數
+        const parentSet = el.closest('.hsv_func_params');
+        if (parentSet && !parentSet.classList.contains('active')) {
+            return; 
+        }
+
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            params[key] = el.checked;
+        } else {
+            params[key] = el.value;
+        }
+    });
+    return params;
+}
+
 // 點素材 顯示對應參數
 assetItems.forEach(item => {
   item.addEventListener('click', () => {
     const name = item.textContent.trim();
-    
-    assetItems.forEach(i => i.classList.remove('active'));
+
+    currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
+
+    document.querySelectorAll('.Asset_item').forEach(i => i.classList.remove('active'));
     item.classList.add('active');
 
     paramEmpty.style.display = 'none';
@@ -244,10 +310,190 @@ const FUNC_CODE = {
   "step": 5
 };
 
-function to255(value, min, max) {
-  const v = Math.min(max, Math.max(min, Number(value) || 0));
-  return Math.round((v - min) / (max - min) * 255);
+// mode 字串 -> 中文
+const MODE_MAP_INV = {};
+for (const [cn, en] of Object.entries(MODE_MAP)) {
+  MODE_MAP_INV[en] = cn;
 }
+
+function normalizeTo255(value, min, max) {
+  const v = Number(value) || 0;
+  const lo = Number(min) || 0;
+  const hi = Number(max) || 1;
+  return Math.round((v - lo) / (hi - lo) * 255);
+}
+
+// 0~255 反映射回原本區間 [min, max]
+function from255(v255, min, max) {
+  const v  = Number(v255) || 0;
+  const lo = Number(min) || 0;
+  const hi = Number(max) || 1;
+  return Math.round(lo + (hi - lo) * (v / 255));
+}
+
+function getParamNorm(set, name, def = 0) {
+  const inp = set.querySelector(`.func_number[data-param="${name}"]`);
+  if (!inp) return def;
+
+  const v   = inp.value;
+  const min = inp.min;
+  const max = inp.max;
+
+  return normalizeTo255(v, min, max);
+}
+
+function collectExtras() {
+  const getNum = sel => {
+    const inp = document.querySelector(sel);
+    return inp ? Number(inp.value || 0) : 0;
+  };
+  const getChecked255 = sel => {
+    const inp = document.querySelector(sel);
+    return inp && inp.checked ? 255 : 0;
+  };
+
+  return {
+    curvature:   getNum('[data-extra="curvature"] .param_number'),
+    length:      getNum('[data-extra="length"] .param_number'),
+    bladeCount:  getNum('[data-extra="bladeCount"] .param_number'),
+    boxsize:     getNum('[data-extra="boxsize"] .param_number'),
+    space:       getNum('[data-extra="space"] .param_number'),
+    reverse:     getChecked255('[data-extra="reverse"] input[type="checkbox"]'),
+    positionFix: getNum('[data-extra="position_fix"] .param_number')
+  };
+}
+
+function packHsvBlock(key) {
+  const block = document.querySelector(`.hsv_block[data-key="${key}"]`);
+  if (!block) return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+
+  const select   = block.querySelector('.hsv_func_select');
+  const funcName = select.value;
+  const funcCode = FUNC_CODE[funcName] ?? 0;
+
+  if (funcCode === 0) {
+    return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+  }
+
+  // 找當前 active function 面板
+  const activeSet =
+    block.querySelector(`.hsv_func_params[data-func="${funcName}"].active`) ||
+    block.querySelector(`.hsv_func_params[data-func="${funcName}"]`);
+
+  const range = getParamNorm(activeSet, "range", 0);
+  const lower = getParamNorm(activeSet, "lower", 0);
+
+  switch (funcCode) {
+    case 1: { // Const
+      const value255 = getParamNorm(activeSet, "value", 0);
+      return { func: 1, range: 0, lower: 0, p1: value255, p2: 0 };
+    }
+
+    case 2: { // Ramp
+      const upper255 = getParamNorm(activeSet, "upper", 0);
+      return { func: 2, range, lower, p1: upper255, p2: 0 };
+    }
+
+    case 3: { // Tri
+      const upper255 = getParamNorm(activeSet, "upper", 0);
+      return { func: 3, range, lower, p1: upper255, p2: 0 };
+    }
+
+    case 4: { // Pulse
+      const top255 = getParamNorm(activeSet, "top", 0);
+      return { func: 4, range, lower, p1: top255, p2: 0 };
+    }
+
+    case 5: { // Step
+      const height255 = getParamNorm(activeSet, "height", 0);
+      const stepNum255 = getParamNorm(activeSet, "step", 0);
+      return { func: 5, range, lower, p1: height255, p2: stepNum255 };
+    }
+
+    default:
+      return { func: 0, range: 0, lower: 0, p1: 0, p2: 0 };
+  }
+}
+
+function packModePFields(modeStr, extras) {
+
+  let p1 = 0, p2 = 0, p3 = 0, p4 = 0;
+
+  switch (modeStr) {
+
+    case "MODES_CLEAR":
+    case "MODES_PLAIN":
+      break;
+
+    case "MODES_SQUARE":
+      p3 = normalizeTo255(extras.boxsize, 0, 300);
+      break;
+
+    case "MODES_SICKLE":
+      p1 = normalizeTo255(extras.positionFix, 0, 255);
+      p3 = normalizeTo255(extras.curvature, 0, 100);
+      p4 = normalizeTo255(extras.length, 0, 300);
+      break;
+
+    case "MODES_FAN":
+      p1 = normalizeTo255(extras.curvature, 0, 100);
+      p3 = normalizeTo255(extras.bladeCount, 0, 12);
+      p4 = normalizeTo255(extras.length, 0, 300);
+      break;
+
+    case "MODES_BOXES":
+      p3 = normalizeTo255(extras.boxsize, 0, 300);
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+
+    case "MODES_CMAP_DNA":
+      p1 = extras.reverse ? 255 : 0;
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+
+    case "MODES_CMAP_FIRE":
+      p4 = normalizeTo255(extras.space, 0, 100);
+      break;
+  }
+
+  return { p1, p2, p3, p4 };
+}
+
+function buildSegmentFromUI(startTime, duration) {
+  const modeStr = currentModeStr || "MODES_PLAIN";
+
+  // 六組 HSV
+  const XH = packHsvBlock("XH");
+  const XS = packHsvBlock("XS");
+  const XV = packHsvBlock("XV");
+  const YH = packHsvBlock("YH");
+  const YS = packHsvBlock("YS");
+  const YV = packHsvBlock("YV");
+
+  // p1~p4
+  const extras = collectExtras();
+  const { p1, p2, p3, p4 } = packModePFields(modeStr, extras);
+
+  return {
+    mode: modeStr,
+    start_time: startTime,
+    duration: duration,
+    XH, XS, XV,
+    YH, YS, YV,
+    p1, p2, p3, p4
+  };
+}
+
+function buildEffectConfigFromUI() {
+  const seg = buildSegmentFromUI(0, 0);
+  const { start_time, duration, ...effectConfig } = seg;
+
+  return effectConfig;
+}
+
+// 轉字串寫法
+// const obj = buildEffectConfigFromUI();
+// const jsonStr = JSON.stringify(obj, null, 2);
 
 function sendToSettime(jsonPath) {
   const currentPlaybackTime = 0; 
@@ -845,49 +1091,141 @@ function updateTimeUI() {
 }
 
 // 🌟 初始化 Asset Canvas1 的 Fabric 畫布
+// 🌟 初始化 Asset Canvas1 的 Fabric 畫布
 function initAsset1Fabric() {
   if (!assetCanvas1El) {
     console.error('找不到 #assetCanvas1');
     return;
   }
   
-  // 確保畫布尺寸匹配元素尺寸（這裡使用 HTML 中設定的寬高 1200x400）
+  // 1. 初始化畫布
   assetCanvas1El.width = assetCanvas1El.clientWidth;
   assetCanvas1El.height = assetCanvas1El.clientHeight;
 
   asset_canvas1 = new fabric.Canvas("assetCanvas1", {
-    selection: true, // 允許選取畫布上的素材
+    selection: true,
     renderOnAddRemove: true
   });
   
-  // 設置初始尺寸 (使用 HTML 中定義的 1200x400 作為基準)
   asset_canvas1.setWidth(assetCanvas1El.clientWidth);
   asset_canvas1.setHeight(assetCanvas1El.clientHeight);
-  const canvasContainer = asset_canvas1.wrapperEl; // 取得 Fabric 的容器 DOM
-  // 處理拖曳事件
+
+  // 2. 處理拖曳放下
+  const canvasContainer = asset_canvas1.wrapperEl;
+
   canvasContainer.addEventListener('dragover', (e) => {
-    e.preventDefault(); // 允許放下
+    e.preventDefault(); 
     e.dataTransfer.dropEffect = 'copy';
   });
 
   canvasContainer.addEventListener('drop', (e) => {
     e.preventDefault();
-    
     if (!asset_canvas1) return;
 
-    // 取得放下時的畫布座標
     const pointer = asset_canvas1.getPointer(e);
     const assetName = e.dataTransfer.getData('text/plain');
     console.log(`放下事件觸發！素材名稱：${assetName}`);
 
-    // 呼叫創建 Fabric 物件的函式
     createAssetOnCanvas(assetName, pointer.x, pointer.y);
   });
+
+  // 🌟 事件監聽整合區
+  function resetAllStrokes() {
+      asset_canvas1.getObjects().forEach(obj => {
+          // 確保它是 Group 且內部有背景方塊 (item(0))
+          if (obj.type === 'group' && obj.item(0)) {
+              obj.item(0).set({
+                  stroke: '#ffffff', // 預設白色
+                  strokeWidth: 1     // 預設細線
+              });
+          }
+      });
+  }
+
+  // A. 選取方塊時：讀取參數
+  asset_canvas1.on('selection:created', loadAssetParams);
+  asset_canvas1.on('selection:updated', loadAssetParams);
+  
+  // 取消選取時：隱藏面板 + 全部變回白色
+  asset_canvas1.on('selection:cleared', () => {
+     resetAllStrokes(); 
+     paramEmpty.style.display = 'block'; 
+     paramMain.classList.add('hidden');
+     console.log("取消選取");
+     asset_canvas1.requestRenderAll();
+  });
+
+  function loadAssetParams(e) {
+    // 容錯寫法
+      const activeObj = e.selected ? e.selected[0] : asset_canvas1.getActiveObject();
+      
+      if (!activeObj || !activeObj.effectName) return;
+
+      console.log(`選取素材：${activeObj.effectName}，讀取參數中...`);
+
+      // 🌟 1. 視覺回饋：先重置所有顏色，再將當前物件設為藍色
+      resetAllStrokes();
+      
+      if (activeObj.item(0)) {
+          activeObj.item(0).set({
+              stroke: '#00aaff', // 🔷 設定選取色 (亮藍色)
+              strokeWidth: 2     // 加粗一點讓選取更明顯
+          });
+      }
+      // 🔒 上鎖
+      isRestoring = true;
+
+      // 1. 切換 UI
+      switchEffectUI(activeObj.effectName);
+
+      // 2. 清空面板 (避免髒數據)
+      resetAllParams(); 
+
+      // 3. 填入參數
+      if (activeObj.effectParams) {
+          restorePanelParams(activeObj.effectParams);
+      }
+
+      // 🔓 解鎖
+      setTimeout(() => {
+          isRestoring = false;
+      }, 10);
+  }
+
+  // B. 面板操作時：同步回方塊
+  // 先移除舊的避免重複 (保險起見)
+  paramMain.removeEventListener('input', syncParamsToActiveObject);
+  paramMain.removeEventListener('change', syncParamsToActiveObject);
+  
+  paramMain.addEventListener('input', syncParamsToActiveObject);
+  paramMain.addEventListener('change', syncParamsToActiveObject);
+
+  function syncParamsToActiveObject(e) {
+      // 🛑 檢查鎖
+      if (isRestoring) return;
+
+      const activeObj = asset_canvas1.getActiveObject();
+      if (!activeObj) return;
+
+      const target = e.target;
+      const key = target.id || target.dataset.param;
+      
+      if (key) {
+          if (!activeObj.effectParams) activeObj.effectParams = {};
+
+          if (target.type === 'checkbox' || target.type === 'radio') {
+              activeObj.effectParams[key] = target.checked;
+          } else {
+              activeObj.effectParams[key] = target.value;
+          }
+          console.log(`同步參數 ${key} -> ${activeObj.effectParams[key]}`);
+      }
+  }
 
   asset_canvas1.requestRenderAll();
 }
 
-// 🔄 核心同步函式：根據時間軸的 Offset 和 Zoom 更新素材位置
+// 根據時間軸的 Offset 和 Zoom 更新素材位置
 function updateAssetPositions() {
   if (!asset_canvas1) return;
 
@@ -898,6 +1236,23 @@ function updateAssetPositions() {
       const newLeft = (obj.startTime - timelineOffset) / secondsPerPixel;
       
       obj.left = newLeft;
+      // 更新寬度 (ScaleX)
+      if (obj.duration !== undefined) {
+          // 算出現在這個 zoom level 下，這個時間長度應該是多少像素
+          const targetWidthPx = obj.duration / secondsPerPixel;
+          
+          // 更新 ScaleX
+          obj.scaleX = targetWidthPx / obj.width;
+
+          // 找出群組裡的文字物件進行修正
+          const textObj = obj.item(1); 
+          if (textObj) {
+              textObj.set({
+                  scaleX: 1 / obj.scaleX,
+                  scaleY: 1 // Y 軸通常鎖定，設為 1 即可，或 1/obj.scaleY
+              });
+          }
+      }
       obj.setCoords(); // 更新物件的控制點座標
     }
   });
@@ -946,20 +1301,18 @@ function createAssetOnCanvas(assetName, x, y) {
         
         // 鎖定移動與縮放限制
         lockMovementY: true,    // 只能左右移動
-        lockScalingY: true,     // 只能左右縮放 (改變寬度)
-        lockRotation: true,     // 禁止旋轉 (時間軸素材通常不需要旋轉)
+        lockScalingY: true,     // 只能左右縮放 
+        lockRotation: true,     // 禁止旋轉 
         // 選取樣式設定
         hasBorders: false,
-        // ✋ 讓控制項比較好抓 (可選)
-        //padding: 5,
-        //borderColor: 'yellow',
+        // 讓控制項比較好抓
         cornerColor: 'white',
         cornerSize: 10,
         transparentCorners: false,
         objectCaching: false
     });
 
-    // 🔒 2. 設定控制點可見性：只保留左右兩側 (ml, mr)
+    // 設定控制點可見性：只保留左右兩側 (ml, mr)
     group.setControlsVisibility({
         mt: false, // 上中
         mb: false, // 下中
@@ -1003,8 +1356,24 @@ function createAssetOnCanvas(assetName, x, y) {
 
         return { minX, maxX };
     }
+// 設定預設時間長度為 1 秒
+    group.duration = 1; 
 
-    // 初始時間計算
+    // 計算初始 ScaleX
+    // 公式：目標像素寬度 = 時間長度 / 每像素秒數
+    // ScaleX = 目標像素寬度 / 原始寬度(100)
+    const targetWidthPx = group.duration / secondsPerPixel;
+    group.scaleX = targetWidthPx / group.width;
+
+    // 修正文字變形 (因為剛才改了 scaleX)
+    textObj.set({
+        scaleX: 1 / group.scaleX,
+        scaleY: 1 
+    });
+
+    // -------------------------------------------------------------
+
+    // 設定開始時間
     group.startTime = timelineOffset + (x * secondsPerPixel);
 
     // -------------------------------------------------------------
@@ -1027,6 +1396,7 @@ function createAssetOnCanvas(assetName, x, y) {
         // 同步時間 (在位置修正後才計算)
         group.startTime = timelineOffset + (group.left * secondsPerPixel);
     });
+
 
     // -------------------------------------------------------------
     // 2. 縮放時的防重疊
@@ -1059,18 +1429,30 @@ function createAssetOnCanvas(assetName, x, y) {
             group.scaleX = maxAllowedWidth / group.width;
             group.left = bounds.maxX - (group.width * group.scaleX) / 2;
         }
-
+        // 公式：像素寬度 * 每像素秒數
+        const currentWidthPx = group.width * group.scaleX;
+        group.duration = currentWidthPx * secondsPerPixel;
         // 同步時間
         group.startTime = timelineOffset + (group.left * secondsPerPixel);
     });
+    // 1. 切換 UI 並重置面板 (確保抓到的是乾淨的預設值)
+    switchEffectUI(assetName);
+    resetAllParams();
 
+    // 把素材名稱存進方塊裡
+    group.effectName = assetName;
+
+    // 3. 抓取當前的面板參數 (預設值)，存入方塊
+    group.effectParams = capturePanelParams();
+    const effect_duration = buildSegmentFromUI(group.startTime,group.duration);
     asset_canvas1.add(group);
-    asset_canvas1.setActiveObject(group); 
+    asset_canvas1.setActiveObject(group);
+    asset_canvas1.fire('selection:created', { target: group, selected: [group] }); 
     asset_canvas1.requestRenderAll();
 }
 //delete功能
 window.addEventListener('keydown', (e) => {
-    // 1. 檢查按鍵是否為 Delete 或 Backspace (Mac 有時是 Backspace)
+    // 1. 檢查按鍵是否為 Delete
     if (e.key === 'Delete') {
         
         // 2. 安全檢查：如果使用者正在輸入框 (input) 或文字區域打字，忽略刪除指令
@@ -1081,7 +1463,7 @@ window.addEventListener('keydown', (e) => {
 
         if (!asset_canvas1) return;
 
-        // 3. 取得目前選取的物件 (getActiveObjects 支援單選與多選)
+        // 3. 取得目前選取的物件
         const activeObjects = asset_canvas1.getActiveObjects();
 
         if (activeObjects.length) {
@@ -1123,3 +1505,342 @@ function initAll() {
 // start
 initAll();
 
+// 自訂義加入
+const btnAddCustom = document.querySelector('.btn_add_custom');
+const btnUpdateCustom = document.querySelector('.btn_update_custom');
+const btnDeleteCustom = document.querySelector('.btn_delete_custom');
+
+function setCustomButtonsEnabled(enabled) {
+  if (btnUpdateCustom) btnUpdateCustom.disabled = !enabled;
+  if (btnDeleteCustom) btnDeleteCustom.disabled = !enabled;
+}
+
+function genPresetId() {
+  if (window.crypto && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  return 'preset_' + Date.now() + '_' + Math.random().toString(16).slice(2);
+}
+
+const CUSTOM_PRESET_KEY = "luxCustomPresets_v1";
+
+function loadCustomPresets() {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PRESET_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+
+    // 如果舊資料沒有 _id，就幫它補一個，避免衝突
+    let changed = false;
+    arr.forEach(p => {
+      if (!p._id) {
+        p._id = genPresetId();
+        changed = true;
+      }
+    });
+    if (changed) {
+      localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(arr));
+    }
+    return arr;
+  } catch (e) {
+    console.error("loadCustomPresets error", e);
+    return [];
+  }
+}
+
+function saveCustomPresets(list) {
+  try {
+    localStorage.setItem(CUSTOM_PRESET_KEY, JSON.stringify(list));
+  } catch (e) {
+    console.error("saveCustomPresets error", e);
+  }
+}
+
+// 還原到UI
+function ensureParamPanelVisible() {
+  // 切到「參數」這頁 tab
+  const tabs = document.querySelectorAll('.param_tab');
+  const bodies = document.querySelectorAll('.param_body');
+  const paramTab = document.querySelector('.param_tab[data-target="params"]') || tabs[0];
+  const paramBody = document.querySelector('.param_body[data-pane="params"]') || bodies[0];
+
+  if (tabs.length && paramTab) {
+    tabs.forEach(t => t.classList.remove('active'));
+    paramTab.classList.add('active');
+  }
+  if (bodies.length && paramBody) {
+    bodies.forEach(b => b.classList.remove('active'));
+    paramBody.classList.add('active');
+  }
+
+  // 把「請從左側選擇一個素材」藏起來，顯示真正的內容
+  const empty = document.querySelector('.param_empty');
+  const main = document.querySelector('.param_main');
+  if (empty) empty.style.display = 'none';
+  if (main) main.classList.remove('hidden');
+}
+
+function setParamFrom255(setElem, paramName, value255) {
+  if (!setElem) return;
+  const num = setElem.querySelector(`.func_number[data-param="${paramName}"]`);
+  if (!num) return;
+
+  const min = num.min;
+  const max = num.max;
+  const uiVal = from255(value255, min, max);
+  num.value = uiVal;
+
+  const range = setElem.querySelector(`.func_range[data-param="${paramName}"]`);
+  if (range) {
+    range.value = uiVal;
+  }
+}
+
+function fillHsvBlockFromConfig(key, cfgBlock) {
+  const block = document.querySelector(`.hsv_block[data-key="${key}"]`);
+  if (!block || !cfgBlock) return;
+
+  const select = block.querySelector('.hsv_func_select');
+  if (!select) return;
+
+  let funcName = "none";
+  for (const [name, code] of Object.entries(FUNC_CODE)) {
+    if (code === cfgBlock.func) {
+      funcName = name;
+      break;
+    }
+  }
+
+  select.value = funcName;
+
+  select.dispatchEvent(new Event('change'));
+
+  // 找當前這個 function 的 set
+  const set = block.querySelector(`.hsv_func_params[data-func="${funcName}"]`);
+  if (!set) return;
+
+  // 還原 range / lower
+  setParamFrom255(set, "range", cfgBlock.range);
+  setParamFrom255(set, "lower", cfgBlock.lower);
+
+  // 還原各 func 的 p1/p2
+  switch (cfgBlock.func) {
+    case 1: // Const: p1 = value
+      setParamFrom255(set, "value", cfgBlock.p1);
+      break;
+    case 2: // Ramp: p1 = upper
+    case 3: // Tri:  p1 = upper
+      setParamFrom255(set, "upper", cfgBlock.p1);
+      break;
+    case 4: // Pulse: p1 = top
+      setParamFrom255(set, "top", cfgBlock.p1);
+      break;
+    case 5: // Step: p1 = height, p2 = step
+      setParamFrom255(set, "height", cfgBlock.p1);
+      setParamFrom255(set, "step",   cfgBlock.p2);
+      break;
+  }
+}
+
+function setExtraNumber(extraName, value255, min, max) {
+  const group = document.querySelector(`[data-extra="${extraName}"]`);
+  if (!group) return;
+
+  const num = group.querySelector('.param_number');
+  if (!num) return;
+
+  const uiVal = from255(value255, min, max);
+  num.value = uiVal;
+
+  const range = group.querySelector('.param_range');
+  if (range) {
+    range.value = uiVal;
+  }
+}
+
+function applyExtrasFromPFields(modeStr, p1, p2, p3, p4) {
+  switch (modeStr) {
+    case "MODES_SQUARE":
+      setExtraNumber("boxsize", p3, 0, 300);
+      break;
+
+    case "MODES_SICKLE":
+      setExtraNumber("position_fix", p1, 0, 255);
+      setExtraNumber("curvature",    p3, 0, 100);
+      setExtraNumber("length",       p4, 0, 300);
+      break;
+
+    case "MODES_FAN":
+      setExtraNumber("curvature",   p1, 0, 100);
+      setExtraNumber("bladeCount",  p3, 0, 12);
+      setExtraNumber("length",      p4, 0, 300);
+      break;
+
+    case "MODES_BOXES":
+      setExtraNumber("boxsize", p3, 0, 300);
+      setExtraNumber("space",   p4, 0, 100);
+      break;
+
+    case "MODES_CMAP_DNA": {
+      // reverse: 0 or 255
+      const chk = document.querySelector('[data-extra="reverse"] input[type="checkbox"]');
+      if (chk) chk.checked = (p1 >= 128);
+      setExtraNumber("space", p4, 0, 100);
+      break;
+    }
+
+    case "MODES_CMAP_FIRE":
+      setExtraNumber("space", p4, 0, 100);
+      break;
+  }
+}
+
+function applyPresetToUI(preset) {
+  if (!preset) return;
+
+  const modeStr = preset.mode || "MODES_PLAIN";
+  currentModeStr = modeStr;   
+
+  const cnName  = MODE_MAP_INV[modeStr] || "純色";
+  window.currentEffectName = cnName; 
+
+  ensureParamPanelVisible();
+
+  const extras = MODE_EXTRAS[modeStr] || [];
+  extraGroups.forEach(g => {
+    const key = g.dataset.extra;
+    g.style.display = extras.includes(key) ? "block" : "none";
+  });
+
+  if (modeStr === "MODES_CLEAR") {
+    paramMain.classList.add('hidden');
+  } else {
+    paramMain.classList.remove('hidden');
+  }
+
+  fillHsvBlockFromConfig("XH", preset.XH);
+  fillHsvBlockFromConfig("XS", preset.XS);
+  fillHsvBlockFromConfig("XV", preset.XV);
+  fillHsvBlockFromConfig("YH", preset.YH);
+  fillHsvBlockFromConfig("YS", preset.YS);
+  fillHsvBlockFromConfig("YV", preset.YV);
+
+  applyExtrasFromPFields(modeStr, preset.p1, preset.p2, preset.p3, preset.p4);
+}
+// 建立小方塊
+function createCustomAssetElement(preset) {
+  const div = document.createElement('div');
+  div.className = 'Asset_item Asset_item--custom';
+  div.dataset.customId = preset._id;
+  div.setAttribute('draggable', true);
+  const modeLabel = (preset.mode || "").replace(/^MODES_/, "");
+  div.textContent = `[自訂] ${modeLabel}`;
+
+  div.addEventListener('click', () => {
+    document.querySelectorAll('.Asset_item').forEach(it => it.classList.remove('active'));
+    div.classList.add('active');
+
+    // 記錄目前選中的自訂義
+    currentCustomPresetId = preset._id;
+    setCustomButtonsEnabled(true);
+
+    applyPresetToUI(preset);
+  });
+
+  return div;
+}
+
+function reloadCustomPresetsUI() {
+  const container = document.querySelector('.Asset_library_content.custom');
+  if (!container) return;
+
+  const list = loadCustomPresets();
+  container.innerHTML = "";
+
+  list.forEach(preset => {
+    const item = createCustomAssetElement(preset);
+    container.appendChild(item);
+
+    // 如果這顆就是 currentCustomPresetId，就讓它保持亮
+    if (preset._id === currentCustomPresetId) {
+      item.classList.add('active');
+    }
+  });
+
+  // 如果沒有任何自訂義，就把按鈕關閉
+  if (!list.length) {
+    currentCustomPresetId = null;
+    setCustomButtonsEnabled(false);
+  }
+}
+
+
+// 綁定按鈕
+function addCurrentToCustomLibrary() {
+  const cfg = buildEffectConfigFromUI(); 
+  const preset = {
+    _id: genPresetId(),
+    ...cfg
+  };
+
+  const list = loadCustomPresets();
+  list.push(preset);
+  saveCustomPresets(list);
+
+  // 新增完，視為選中這個 preset
+  currentCustomPresetId = preset._id;
+  setCustomButtonsEnabled(true);
+  reloadCustomPresetsUI();
+}
+
+// 綁定新增按鈕
+if (btnAddCustom) {
+  btnAddCustom.addEventListener('click', addCurrentToCustomLibrary);
+}
+
+// 刪除與修改自定義
+function updateCurrentCustomPreset() {
+  if (!currentCustomPresetId) return; 
+
+  const list = loadCustomPresets();
+  const idx = list.findIndex(p => p._id === currentCustomPresetId);
+  if (idx === -1) return;
+
+  // 讀現在 UI 的設定
+  const cfg = buildEffectConfigFromUI();
+
+  // 保留原本 _id，其他用新的設定覆蓋
+  list[idx] = { _id: currentCustomPresetId, ...cfg };
+  saveCustomPresets(list);
+
+  reloadCustomPresetsUI();
+}
+
+// 綁定按鈕
+if (btnUpdateCustom) {
+  btnUpdateCustom.addEventListener('click', updateCurrentCustomPreset);
+}
+
+function deleteCurrentCustomPreset() {
+  if (!currentCustomPresetId) return;
+
+  let list = loadCustomPresets();
+  const idx = list.findIndex(p => p._id === currentCustomPresetId);
+  if (idx === -1) return;
+
+  list.splice(idx, 1);
+  saveCustomPresets(list);
+
+  currentCustomPresetId = null;
+  setCustomButtonsEnabled(false);
+  reloadCustomPresetsUI();
+
+  resetAllParams();
+  paramMain.classList.add('hidden');
+  paramEmpty.style.display = 'block';
+}
+
+if (btnDeleteCustom) {
+  btnDeleteCustom.addEventListener('click', deleteCurrentCustomPreset);
+}
