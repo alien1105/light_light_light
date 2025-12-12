@@ -52,7 +52,7 @@ public:
     void updateOTA();
 
     /* Obtain current music time stamp and return current playing effect*/
-    time_t check_start_time(uint8_t id, MODES mode, uint8_t* force_start);
+    time_t check_start_time(uint8_t id, MODES mode, uint8_t* force_mode);
 
     void WifiErrorHandle();
 };

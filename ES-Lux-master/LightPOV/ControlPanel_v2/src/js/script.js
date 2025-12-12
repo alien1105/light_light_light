@@ -1,265 +1,33 @@
+// 修正 Fabric.js 對 textBaseline 使用 alphabetical 的 bug
+(function () {
+    const _set = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'textBaseline').set;
+    Object.defineProperty(CanvasRenderingContext2D.prototype, 'textBaseline', {
+        set(value) {
+            if (value === 'alphabetical') {
+                // 強制替換成合法值
+                value = 'alphabetic';
+            }
+            _set.call(this, value);
+        }
+    });
+})();
+
 // DOM elements
 const fileInput = document.getElementById('fileInput');
+const musicFileLoadBtn = document.getElementById('music_file_load_Btn');
 const audio = document.getElementById('audio');
 const playToggle = document.getElementById('playToggle');
+const stopBtn = document.getElementById('stopBtn');
 const timeLabel = document.getElementById('time');
-const canvas = document.getElementById('waveform');
-const ctx = canvas.getContext('2d');
 
+const minInput = document.getElementById('minInput');
+const secInput = document.getElementById('secInput');
 
-// fix for high-DPI screens
-function resizeCanvasToDisplaySize(c) {
-  const dpr = window.devicePixelRatio || 1;
-  const rect = c.getBoundingClientRect();
-  c.width = Math.floor(rect.width * dpr);
-  c.height = Math.floor(rect.height * dpr);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.scale(dpr, dpr);
-}
-resizeCanvasToDisplaySize(canvas);
+const volumeSlider = document.getElementById('volumeSlider');
+const volumeValue = document.getElementById('volumeValue');
 
-// Audio variables
-let audioCtx = null;
-let audioBuffer = null;
-let peaks = [];
-let animationId = null;
-let isDragging = false;
-let wasPlayingBeforeDrag = false;
-
-// Format seconds → mm:ss
-function fmt(t) {
-  if (!isFinite(t)) return '00:00';
-  const m = Math.floor(t / 60);
-  const s = Math.floor(t % 60);
-  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-}
-
-// Draw waveform and playhead
-function drawWave(progress = 0) {
-  const w = canvas.clientWidth;
-  const h = canvas.clientHeight;
-  ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#07101a';
-  ctx.fillRect(0, 0, w, h);
-  const mid = h / 2;
-  const peakColor = '#4fb3d6';
-  const playedColor = '#dff6ff';
-
-  // all peaks
-  ctx.beginPath();
-  ctx.lineWidth = 1;
-  ctx.strokeStyle = peakColor;
-  for (let x = 0; x < w; x++) {
-    const idx = Math.floor(x * (peaks.length / w));
-    const p = peaks[idx] || 0;
-    const y = p * (h / 2);
-    ctx.moveTo(x + 0.5, mid - y);
-    ctx.lineTo(x + 0.5, mid + y);
-  }
-  ctx.stroke();
-
-  // played portion
-  if (progress > 0) {
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(0, 0, w * progress, h);
-    ctx.clip();
-    ctx.strokeStyle = playedColor;
-    for (let x = 0; x < w; x++) {
-      const idx = Math.floor(x * (peaks.length / w));
-      const p = peaks[idx] || 0;
-      const y = p * (h / 2);
-      ctx.moveTo(x + 0.5, mid - y);
-      ctx.lineTo(x + 0.5, mid + y);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // playhead
-  const playX = w * progress;
-  ctx.beginPath();
-  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-  ctx.moveTo(playX, 0);
-  ctx.lineTo(playX, h);
-  ctx.stroke();
-}
-
-// compute waveform peaks
-function computePeaks(buffer, count = 2000) {
-  const channelData = buffer.getChannelData(0);
-  const samples = channelData.length;
-  const block = Math.floor(samples / count) || 1;
-  const peaks = new Float32Array(count);
-  for (let i = 0; i < count; i++) {
-    const start = i * block;
-    const end = Math.min(start + block, samples);
-    let max = 0;
-    for (let j = start; j < end; j++) {
-      const v = Math.abs(channelData[j]);
-      if (v > max) max = v;
-    }
-    peaks[i] = max;
-  }
-  return peaks;
-}
-
-// update progress animation
-function animate() {
-    if (!audioBuffer) return;
-    const duration = audio.duration;
-    const current = audio.currentTime;
-    const progress = Math.min(1, current / duration);
-    drawWave(progress);
-    timeLabel.textContent = `${fmt(current)} / ${fmt(duration)}`;
-    animationId = requestAnimationFrame(animate);
-}
-
-// convert clientX to playback progress (0–1)
-function clientXToProgress(x) {
-    const rect = canvas.getBoundingClientRect();
-    const offset = Math.min(rect.width, Math.max(0, x - rect.left));
-    return offset / rect.width;
-}
-
-// seek audio
-function seek(progress) {
-    if (!audioBuffer) return;
-    const duration = audio.duration;
-    const time = Math.min(duration, Math.max(0, progress * duration));
-    audio.currentTime = time;
-    drawWave(progress);
-    timeLabel.textContent = `${fmt(time)} / ${fmt(duration)}`;
-}
-
-// file load
-document.getElementById('music_file_load_Btn').addEventListener('click', () => {
-    document.getElementById('fileInput').click();
-});
-fileInput.addEventListener('change', async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    const url = URL.createObjectURL(file);
-    audio.src = url;
-    audio.load();
-    playToggle.disabled = false;
-    playToggle.textContent = "▶ 播放";
-
-    const buf = await file.arrayBuffer();
-    try {
-        audioBuffer = await audioCtx.decodeAudioData(buf.slice(0));
-    } catch {
-        audioBuffer = await new Promise((res, rej) => audioCtx.decodeAudioData(buf, res, rej));
-    }
-    const pixelWidth = canvas.width / (window.devicePixelRatio || 1);
-    peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(pixelWidth * 2)));                                                                                                                                                                                                  
-    /*peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(canvas.clientWidth * 2)));*/
-    drawWave(0);
-    timeLabel.textContent = `00:00 / ${fmt(audioBuffer.duration)}`;
-});
-
-// play / pause toggle
-playToggle.addEventListener('click', async () => {
-    if (!audio.src) return;
-    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    if (audioCtx.state === 'suspended') await audioCtx.resume();
-
-    if (audio.paused || audio.ended) {
-        await audio.play();
-        playToggle.textContent = "⏸ 暫停";
-        cancelAnimationFrame(animationId);
-        animate();
-    } 
-    else {
-        audio.pause();
-        playToggle.textContent = "▶ 播放";
-        cancelAnimationFrame(animationId);
-    }
-});
-
-// audio end
-audio.addEventListener('ended', () => {
-    cancelAnimationFrame(animationId);
-    drawWave(1);
-     playToggle.textContent = "▶ 播放";
-});
-
-// 拖曳時間軸
-let dragProgress = 0;
-let dragTarget = 0;
-let dragRAF = null;
-
-canvas.addEventListener('pointerdown', (ev) => {
-    ev.preventDefault();
-    wasPlayingBeforeDrag = !audio.paused && !audio.ended;
-    if (wasPlayingBeforeDrag) audio.pause();
-    isDragging = true;
-    canvas.setPointerCapture(ev.pointerId);
-    dragTarget = dragProgress = clientXToProgress(ev.clientX);
-    cancelAnimationFrame(animationId);
-    smoothDragAnimate(); // 啟動平滑拖曳動畫
-});
-
-canvas.addEventListener('pointermove', (ev) => {
-    if (!isDragging) return;
-    ev.preventDefault();
-    dragTarget = clientXToProgress(ev.clientX);
-});
-
-canvas.addEventListener('pointerup', (ev) => {
-    if (!isDragging) return;
-    isDragging = false;
-    canvas.releasePointerCapture(ev.pointerId);
-
-    const p = clientXToProgress(ev.clientX);
-    audio.currentTime = (audio.duration || audioBuffer.duration) * p;
-    drawWave(p);
-
-    if (wasPlayingBeforeDrag) {
-            audio.play();
-            playToggle.textContent = "⏸ 暫停";
-            cancelAnimationFrame(animationId);
-            animate();
-    } 
-    else {
-        playToggle.textContent = "▶ 播放";
-    }
-});
-
-// 平滑拖曳動畫（使用插值避免卡頓）
-function smoothDragAnimate() {
-    if (!isDragging) return;
-    dragProgress += (dragTarget - dragProgress); // 插值過渡
-    drawWave(dragProgress);
-
-  // 若音樂時間已載入，邊拖曳邊更新播放時間（即時預覽）
-  if (audio.duration > 0) {
-    audio.currentTime = audio.duration * dragProgress;
-  }
-
-  dragRAF = requestAnimationFrame(smoothDragAnimate);
-}
-
-
-// click seek
-canvas.addEventListener('click', (ev) => {
-    if (isDragging) return;
-    const p = clientXToProgress(ev.clientX);
-    seek(p);
-});
-
-// resize redraw
-window.addEventListener('resize', () => {
-    resizeCanvasToDisplaySize(canvas);
-  if (audioBuffer) {
-        const progress = audio.currentTime / audio.duration;
-        drawWave(progress);
-  }
-});
+const timelineCanvasEl = document.getElementById('timelineCanvas');
+const assetCanvas1El = document.getElementById('assetCanvas1');
 
 // asset library
 document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
@@ -314,6 +82,8 @@ function resetAllParams() {
       inp.value = inp.defaultValue;
   });
 
+
+
   // Reset HSV function
   paramMain.querySelectorAll('.hsv_block').forEach(block => {
     const sel = block.querySelector('.hsv_func_select');
@@ -324,6 +94,55 @@ function resetAllParams() {
 
     sets.forEach(s => s.classList.toggle('active', s.dataset.func === func));
   });
+}
+
+// 切換參數介面
+function switchEffectUI(name) {
+    // 1. 更新當前的模式字串 (供後續儲存使用)
+    currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
+
+    // 2. 顯示參數面板，隱藏空狀態
+    if (paramEmpty) paramEmpty.style.display = 'none';
+    if (paramMain) paramMain.classList.remove('hidden');
+
+    // 3. 根據 EFFECT_CONFIG 決定要顯示哪些額外參數 (Extra Groups)
+    const cfg = EFFECT_CONFIG[name] || { extras: [] };
+
+    if (extraGroups) {
+        extraGroups.forEach(g => {
+            const key = g.dataset.extra;
+            g.style.display = cfg.extras.includes(key) ? "block" : "none";
+        });
+    }
+
+    // 4. 特殊處理：如果是 "清除"，則隱藏面板
+    if (name === "清除") {
+        paramMain.classList.add('hidden');
+    }
+}
+
+// 抓取目前面板上所有輸入框的值 (只抓取「顯示中」的參數)
+function capturePanelParams() {
+    const params = {};
+    const inputs = document.querySelectorAll('.param_main input, .param_main select');
+    
+    inputs.forEach(el => {
+        const key = el.id || el.dataset.param;
+        if (!key) return;
+
+        // 🛑 核心修正：過濾掉隱藏的 HSV 參數
+        const parentSet = el.closest('.hsv_func_params');
+        if (parentSet && !parentSet.classList.contains('active')) {
+            return; 
+        }
+
+        if (el.type === 'checkbox' || el.type === 'radio') {
+            params[key] = el.checked;
+        } else {
+            params[key] = el.value;
+        }
+    });
+    return params;
 }
 
 // 點素材 顯示對應參數
@@ -352,6 +171,14 @@ assetItems.forEach(item => {
     if (name === "清除") {
       paramMain.classList.add('hidden');
     }
+  });
+  item.setAttribute('draggable', true);
+  item.addEventListener('dragstart', (e) => {
+    const name = item.textContent.trim();
+    // 將素材名稱（如 "方形", "DNA"）儲存到 DataTransfer 物件中
+    e.dataTransfer.setData('text/plain', name);
+    // 設置一個拖曳圖示（可選，通常瀏覽器會提供預設圖示）
+    e.dataTransfer.effectAllowed = 'copy'; 
   });
 });
 
@@ -681,6 +508,1003 @@ function sendToSettime(jsonPath) {
   })
 }
 
+// Audio / waveform state
+let audioCtx = null;
+let audioBuffer = null;
+let peaks = [];
+let audioDuration = 0;
+let waveformLines = [];
+
+// Fabric timeline state (工程時間系統)
+let timescale_canvas = null;
+let asset_canvas1 = null; 
+let timelineOffset = 0; // seconds at left edge
+let secondsPerPixel = 1 / 100; // initial: 1px = 0.01s
+const minZoom = 1 / 500;
+const maxZoom = 1 / 3;
+
+let waveformObj = null;      // fabric.Image for waveform clip
+let waveformImgURL = null;   // blob/dataURL
+let clipStartSec = 0;        // clip start time in timeline seconds
+let clipWidthPx = 0;         // width on screen in px for the clip (derived)
+let globalTime = 0;          // engine time in seconds
+let isPlaying = false;
+let rafId = null;
+let lastRAFTime = null;
+
+let playhead = null;
+
+// Helper utilities
+function fmt(t) {
+  if (!isFinite(t)) return '00:00';
+  const m = Math.floor(t / 60);
+  const s = Math.floor(t % 60);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// Timeline initialization
+function initTimelineFabric() {
+  timescale_canvas = new fabric.Canvas("timelineCanvas", {
+    selection: false,
+    renderOnAddRemove: false,
+    preserveObjectStacking: true
+  });
+
+  // ensure canvas size matches element size
+  timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
+  timescale_canvas.setHeight(timelineCanvasEl.clientHeight);
+
+  // timeline drag (panning) when clicking empty space
+  let isPanning = false;
+  let lastPanX = 0;
+  // 🌟 新增變數：用於判斷是否發生拖曳
+  let isDraggingTimeline = false;
+  timescale_canvas.on('mouse:down', (e) => {
+    // if clicked an object, do nothing (object drag handlers will run)
+    if (e.target) return;
+    isPanning = true;
+    lastPanX = e.pointer.x;
+    // 🌟 記錄初始位置，並重設拖曳旗標
+    initialClickX = e.pointer.x;
+    isDraggingTimeline = false;
+  });
+
+  timescale_canvas.on('mouse:move', (e) => {
+    if (!isPanning) return;
+    const dx = e.pointer.x - lastPanX;
+    isDraggingTimeline = true;
+    lastPanX = e.pointer.x;
+    timelineOffset -= dx * secondsPerPixel;
+    if (timelineOffset < 0) timelineOffset = 0;
+    drawTimeline();
+  });
+
+  timescale_canvas.on('mouse:up', (e) => {
+    if (!isPanning) return;
+    // 🌟 關鍵修正：檢查是否為點擊 (沒有發生拖曳)
+    // 且確保 e.target 為空 (沒有點擊到 waveformObj)
+    if (!isDraggingTimeline && !e.target) {
+        const p = e.pointer;
+        const clickedTime = timelineOffset + p.x * secondsPerPixel;
+        seekGlobal(clickedTime,false);
+    }
+    isPanning = false;
+    
+  });
+
+  // zoom with wheel - keep center time anchored
+  timescale_canvas.on('mouse:wheel', (opt) => {
+    const e = opt.e;
+    const wheelDelta = e.deltaY;
+    const rect = timelineCanvasEl.getBoundingClientRect();
+    const offsetX = e.clientX - rect.left; // canvas coordinates
+
+    const centerTime = timelineOffset + offsetX * secondsPerPixel;
+
+    if (wheelDelta < 0) secondsPerPixel *= 0.9;
+    else secondsPerPixel *= 1.1;
+
+    secondsPerPixel = Math.max(minZoom, Math.min(maxZoom, secondsPerPixel));
+
+    // keep same centerTime
+    timelineOffset = centerTime - offsetX * secondsPerPixel;
+    if (timelineOffset < 0) timelineOffset = 0;
+
+    drawTimeline();
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+
+  // create playhead (visual only)
+  playhead = new fabric.Line([0, 0, 0, timescale_canvas.getHeight()], {
+    stroke: 'red',
+    strokeWidth: 2,
+    selectable: false,
+    evented: false
+  });
+  timescale_canvas.add(playhead);
+
+  drawTimeline();
+}
+
+// Draw timeline: ticks, labels, waveformObj (if present), playhead
+function drawTimeline() {
+  if (!timescale_canvas) return;
+  const canvas = timescale_canvas;
+  const w = canvas.getWidth();
+  const h = canvas.getHeight();
+
+  canvas.clear();
+
+  // baseline
+  const baseY = Math.floor(h * 0.6);
+  canvas.add(new fabric.Line([0, 60, w, 60], {
+    stroke: '#ffffff', strokeWidth: 2, selectable: false, evented: false
+  }));
+
+  // determine tick spacing
+  let majorTick = 1;
+  if (secondsPerPixel < 1 / 800) majorTick = 0.5;
+  if (secondsPerPixel < 1 / 1500) majorTick = 0.2;
+  if (secondsPerPixel > 1 / 40) majorTick = 5;
+  if (secondsPerPixel > 1 / 20) majorTick = 10;
+  if (secondsPerPixel > 1 / 10) majorTick = 30;
+  if (secondsPerPixel > 1 / 5) majorTick = 60;
+
+  const startSec = timelineOffset;
+  const endSec = timelineOffset + w * secondsPerPixel;
+  let firstTick = Math.ceil(startSec / majorTick) * majorTick;
+
+  for (let t = firstTick; t <= endSec; t += majorTick) {
+    const x = (t - timelineOffset) / secondsPerPixel;
+    canvas.add(new fabric.Line([x, 40, x, 60], {
+      stroke: '#ffffff', strokeWidth: 1, selectable: false, evented: false
+    }));
+
+    const mm = String(Math.floor(Math.abs(t) / 60)).padStart(2, '0');
+    const ss = String(Math.floor(Math.abs(t) % 60)).padStart(2, '0');
+    const labelText = (t < 0 ? '-' : '') + `${mm}:${ss}`;
+
+    canvas.add(new fabric.Text(labelText, {
+      left: x + 3, top: 6, fill: '#ffffff', fontSize: 12,
+      selectable: false, evented: false
+    }));
+  }
+
+  // add waveform object if exists
+  if (waveformObj && audioBuffer) {
+    updateWaveformScaleAndPos(); // ensure scale/left are correct for current zoom/offset
+    canvas.add(waveformObj);
+
+      timescale_canvas.add(waveformObj);
+      
+      // 依序將線段加入畫布
+      waveformLines.forEach(line => timescale_canvas.add(line));
+  }
+  // add playhead on top
+  updatePlayheadVisual();
+  canvas.add(playhead);
+  updateAssetPositions();
+  canvas.requestRenderAll();
+}
+
+// Create waveform image from peaks and add as Fabric image (clip)
+async function createWaveformImageAndAddToTimeline() {
+  if (!audioBuffer || !timescale_canvas) return;
+
+  // create a large base image width (e.g., px per second base)
+  const basePxPerSec = 200; // tune: larger = more detailed waveform image
+  const baseWidth = Math.max(2000, Math.floor(audioBuffer.duration * basePxPerSec));
+  const height = 95;
+
+  const cv = document.createElement('canvas');
+  cv.width = baseWidth;
+  cv.height = height;
+  const c = cv.getContext('2d');
+
+  // background
+  c.fillStyle = "#0d1117";
+  c.fillRect(0, 0, baseWidth, height);
+
+  // draw peaks
+  const mid = height / 2;
+  c.strokeStyle = "#4fb3d6";
+  c.lineWidth = 1;
+  c.beginPath();
+
+  for (let x = 0; x < baseWidth; x++) {
+    const idx = Math.floor(x * (peaks.length / baseWidth));
+    const p = peaks[idx] || 0;
+    const y = p * (height / 2);
+    c.moveTo(x + 0.5, mid - y);
+    c.lineTo(x + 0.5, mid + y);
+  }
+  c.stroke();
+
+  // convert to dataURL
+  waveformImgURL = cv.toDataURL();
+
+  // remove old waveformObj
+  if (waveformObj) {
+    timescale_canvas.remove(waveformObj);
+    waveformObj = null;
+  }
+
+  return new Promise((resolve) => {
+    fabric.Image.fromURL(waveformImgURL, (img) => {
+      waveformObj = img;
+      waveformObj.set({
+        left: 0,
+        top: 110,
+        originY: 'center',
+        selectable: true,
+        hasControls: false,
+        hasBorders: false,
+        hoverCursor: 'grab'
+      });
+
+
+      // make sure user can only drag horizontally
+    waveformObj.on('moving', () => {
+    waveformObj.top = 110;
+
+    // 計算 clipStartSec（尚未 clamp）
+    let newClipStart = timelineOffset + waveformObj.left * secondsPerPixel;
+
+    // ❗ 若小於 0 → 強制回到 0
+    if (newClipStart < 0) {
+        newClipStart = 0;
+        waveformObj.left = (0 - timelineOffset) / secondsPerPixel;
+    }
+
+    clipStartSec = newClipStart;
+
+    ensureAudioSyncToGlobal(true);
+    updateTimeUI();
+    // 🎯 修正點 3: 同步三條線段的位置 (只需同步 left)
+    waveformLines.forEach((line,index) => {
+        if (index === 1) { // 🌟 右側框線 (index=1)
+            // 右框線位置 = 波形圖起始位置 + 拉伸後的寬度
+            line.left = waveformObj.left + clipWidthPx;
+        } else {
+            // 左側 (index=0) 和底部 (index=2) 框線
+            line.left = waveformObj.left;
+        }
+        line.setCoords();
+    });
+    timescale_canvas.requestRenderAll();
+});
+
+
+      // initial scale & position
+      updateWaveformScaleAndPos();
+      // 🎯 修正點 2-2: 在此處創建三條線段 (左、右、底)
+    waveformLines = []; // 清空舊的線段
+    const strokeOpts = {
+      stroke: '#ffffff',
+      strokeWidth: 2,
+      selectable: false,
+      evented: false
+    };
+    const topY = 110 - img.height / 2; // top 屬性是 110
+    const bottomY = 110 + img.height / 2;
+    const height = img.height;
+    const width = img.width;
+
+    // 1. 左側框線: 
+    const leftLine = new fabric.Line([0, topY, 0, bottomY], strokeOpts);
+    leftLine.set({ originY: 'center', top: 110 });
+
+    // 2. 右側框線:
+    const rightLine = new fabric.Line([width, topY, width, bottomY], strokeOpts);
+    rightLine.set({ originY: 'center', top: 110 });
+
+    // 3. 底部框線: (使用相對座標 [0, 0] 到 [width, 0], 然後用 top 定位在 bottomY)
+    const bottomLine = new fabric.Line([0, 0, width, 0], strokeOpts);
+    bottomLine.set({ originY: 'center', top: bottomY });
+
+
+    waveformLines.push(leftLine, rightLine, bottomLine);
+    
+    // 依序將線段加入畫布
+    waveformLines.forEach(line => timescale_canvas.add(line));
+      timescale_canvas.add(waveformObj);
+      timescale_canvas.requestRenderAll();
+      resolve();
+    });
+  });
+}
+
+// Update waveform scale based on secondsPerPixel and clipStartSec -> position left
+function updateWaveformScaleAndPos() {
+  if (!waveformObj || !audioBuffer || !timescale_canvas) return;
+
+  const totalSec = audioBuffer.duration;
+  audioDuration = totalSec;
+
+  // compute width in px for the clip on the timeline (totalSec / secondsPerPixel)
+  const totalWidthPx = totalSec / secondsPerPixel;
+  const naturalW = waveformObj.width || 1;
+  waveformObj.scaleX = totalWidthPx / naturalW;
+  waveformObj.scaleY = 1;
+
+  clipWidthPx = totalWidthPx;
+
+  // left position = (clipStartSec - timelineOffset)/secondsPerPixel
+  waveformObj.left = (clipStartSec - timelineOffset) / secondsPerPixel;
+// 🎯 同步線段的位置與縮放
+  waveformLines.forEach((line, index) => {
+      line.left = waveformObj.left;
+      
+      // 底部線段 (index=2) 繼承縮放
+      if (index === 2) {
+          line.scaleX = waveformObj.scaleX; 
+      }
+      else if (index === 1) { // 🌟 新增：針對右框線
+          // 右框線的位置 = 波形圖起始位置 + 拉伸後的總寬度
+          line.left = waveformObj.left + clipWidthPx;
+          line.scaleX = 1; // 保持固定厚度 
+      }
+      else {
+          // 左右框線保持自然寬度
+          line.scaleX = 1; 
+      }
+      
+  });
+ // ❗ clipStartSec 不可小於 0
+if (clipStartSec < 0) clipStartSec = 0;
+
+  // ensure left within reasonable bounds
+  const canvasW = timescale_canvas.getWidth();
+  if (waveformObj.left < -clipWidthPx) waveformObj.left = -clipWidthPx;
+  if (waveformObj.left > canvasW) waveformObj.left = canvasW;
+}
+
+// Global play control (engine) - RAF tick advances globalTime
+function playGlobal() {
+  if (!audioBuffer) return;
+  if (!isPlaying) {
+    isPlaying = true;
+    lastRAFTime = performance.now();
+    rafTick(lastRAFTime);
+    playToggle.textContent = "⏸ 暫停";
+  }
+}
+function pauseGlobal() {
+  isPlaying = false;
+  playToggle.textContent = "▶ 播放";
+  if (rafId) {
+    cancelAnimationFrame(rafId);
+    rafId = null;
+  }
+  // pause audio as well
+  if (!audio.paused) audio.pause();
+}
+
+function rafTick(now) {
+  rafId = requestAnimationFrame(rafTick);
+  if (!lastRAFTime) lastRAFTime = now || performance.now();
+  const delta = ((now || performance.now()) - lastRAFTime) / 1000;
+  lastRAFTime = now || performance.now();
+
+  if (isPlaying) {
+    globalTime += delta;
+    if (globalTime < 0) globalTime = 0;
+
+    // sync audio to engine: only when in clip range
+    ensureAudioSyncToGlobal();
+    updateTimeUI();
+    updatePlayheadVisual();
+
+    // we render once per frame when playing
+    timescale_canvas.requestRenderAll();
+  }
+}
+
+// Ensure audio playback is synced to globalTime and clip range (DAW logic)
+// immediate=true when called during dragging for immediate seek/play
+function ensureAudioSyncToGlobal(immediate = false) {
+  if (!audioBuffer) return;
+  const clipEnd = clipStartSec + audioBuffer.duration;
+  const inClip = globalTime >= clipStartSec && globalTime < clipEnd;
+
+  if (inClip) {
+    const targetAudioTime = globalTime - clipStartSec;
+    const diff = Math.abs((audio.currentTime || 0) - targetAudioTime);
+
+    // Need to seek/play?
+    if (audio.paused || diff > 0.08 || immediate) {
+      audio.currentTime = Math.min(Math.max(0, targetAudioTime), audioBuffer.duration - 0.001);
+      if (isPlaying) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        audio.play().catch(()=>{});
+      }
+    }
+  } else {
+    // outside clip -> pause audio
+    if (!audio.paused) audio.pause();
+  }
+}
+
+// Update playhead visual position
+function updatePlayheadVisual() {
+  if (!playhead || !timescale_canvas) return;
+  const x = (globalTime - timelineOffset) / secondsPerPixel;
+  playhead.set({ x1: x, x2: x, y1: 0, y2: timescale_canvas.getHeight() });
+}
+
+// Seek globalTime (click on timeline or jump input)
+function seekGlobal(t,center = true) {
+  // 1. 設定新的全域時間
+  globalTime = Math.max(0, Math.min(t, 999999)); // cap very large values
+  
+  // 2. 計算讓 globalTime 位於畫布中央的新 timelineOffset
+  if (center && timescale_canvas) {
+    const canvasWidth = timescale_canvas.getWidth();
+    // 讓 globalTime 位於畫布寬度的一半位置
+    const offsetToCenter = canvasWidth * secondsPerPixel / 2; 
+    
+    // 計算新的 offset
+    let newOffset = globalTime - offsetToCenter;
+    
+    // 確保 timelineOffset 不為負值
+    timelineOffset = Math.max(0, newOffset);
+  }
+
+  // 3. 執行同步和重繪
+  ensureAudioSyncToGlobal();
+  updateTimeUI();
+  drawTimeline();
+}
+
+// Time input jump handler
+function jumpToTimeFromInputs() {
+  const minutes = parseInt(minInput.value, 10) || 0;
+  const seconds = parseInt(secInput.value, 10) || 0;
+  if (seconds > 59) {
+    alert('秒數不可大於59');
+    return;
+  }
+  const total = minutes * 60 + seconds;
+  if (audioBuffer && total > (audioBuffer.duration + 100000)) {
+    // arbitrary large check; allow seeking outside for timeline though
+    alert('輸入時間超出合理範圍');
+    return;
+  }
+  seekGlobal(total);
+  // 清空輸入欄
+  minInput.value = '';
+  secInput.value = '';
+}
+
+minInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    secInput.focus();
+  }
+});
+secInput.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Enter') {
+    ev.preventDefault();
+    jumpToTimeFromInputs();
+  }
+});
+
+// Compute peaks (same algorithm as before)
+function computePeaks(buffer, count = 2000) {
+  const channelData = buffer.getChannelData(0);
+  const samples = channelData.length;
+  const block = Math.floor(samples / count) || 1;
+  const peaks = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    const start = i * block;
+    const end = Math.min(start + block, samples);
+    let max = 0;
+    for (let j = start; j < end; j++) {
+      const v = Math.abs(channelData[j]);
+      if (v > max) max = v;
+    }
+    peaks[i] = max;
+  }
+  return peaks;
+}
+
+// File load and decode
+musicFileLoadBtn.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', async (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  const url = URL.createObjectURL(file);
+  audio.src = url;
+  audio.load();
+
+  const buf = await file.arrayBuffer();
+  try {
+    audioBuffer = await audioCtx.decodeAudioData(buf.slice(0));
+  } catch (err) {
+    audioBuffer = await new Promise((res, rej) => audioCtx.decodeAudioData(buf, res, rej));
+  }
+
+  audioDuration = audioBuffer.duration;
+  peaks = computePeaks(audioBuffer, Math.max(1024, Math.floor(audioBuffer.duration * 100)));
+
+  // reset clip start to 0 and engine time to 0
+  clipStartSec = 0;
+  globalTime = 0;
+
+  // create waveform image & add to timeline
+  await createWaveformImageAndAddToTimeline();
+
+  playToggle.disabled = false;
+  stopBtn.disabled = false;
+  updateTimeUI();
+  drawTimeline();
+});
+
+// Play / Pause / Stop handlers
+playToggle.addEventListener('click', async () => {
+  if (!audioBuffer) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') await audioCtx.resume();
+
+  if (!isPlaying) {
+    playGlobal();
+  } else {
+    pauseGlobal();
+  }
+});
+
+stopBtn.addEventListener('click', () => {
+  pauseGlobal();
+  globalTime = 0;
+  ensureAudioSyncToGlobal();
+  updateTimeUI();
+  drawTimeline();
+});
+
+// Volume control
+volumeSlider.addEventListener('input', () => {
+  const vol = volumeSlider.value / 100;
+  audio.volume = vol;
+  volumeValue.textContent = `${volumeSlider.value}%`;
+});
+
+// Window resize: resize fabric canvas and redraw
+window.addEventListener('resize', () => {
+  if (!timescale_canvas) return;
+  timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
+  timescale_canvas.setHeight(timelineCanvasEl.clientHeight);
+  drawTimeline();
+});
+
+// Update time label UI
+function updateTimeUI() {
+  timeLabel.textContent = `當前時間:${fmt(globalTime)}`;
+  volumeValue.textContent = `${Math.round(audio.volume * 100)}%`;
+}
+
+// 🌟 初始化 Asset Canvas1 的 Fabric 畫布
+// 🌟 初始化 Asset Canvas1 的 Fabric 畫布
+function initAsset1Fabric() {
+  if (!assetCanvas1El) {
+    console.error('找不到 #assetCanvas1');
+    return;
+  }
+  
+  // 1. 初始化畫布
+  assetCanvas1El.width = assetCanvas1El.clientWidth;
+  assetCanvas1El.height = assetCanvas1El.clientHeight;
+
+  asset_canvas1 = new fabric.Canvas("assetCanvas1", {
+    selection: true,
+    renderOnAddRemove: true
+  });
+  
+  asset_canvas1.setWidth(assetCanvas1El.clientWidth);
+  asset_canvas1.setHeight(assetCanvas1El.clientHeight);
+
+  // 2. 處理拖曳放下
+  const canvasContainer = asset_canvas1.wrapperEl;
+
+  canvasContainer.addEventListener('dragover', (e) => {
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!asset_canvas1) return;
+
+    const pointer = asset_canvas1.getPointer(e);
+    const assetName = e.dataTransfer.getData('text/plain');
+    console.log(`放下事件觸發！素材名稱：${assetName}`);
+
+    createAssetOnCanvas(assetName, pointer.x, pointer.y);
+  });
+
+  // 🌟 事件監聽整合區
+  function resetAllStrokes() {
+      asset_canvas1.getObjects().forEach(obj => {
+          // 確保它是 Group 且內部有背景方塊 (item(0))
+          if (obj.type === 'group' && obj.item(0)) {
+              obj.item(0).set({
+                  stroke: '#ffffff', // 預設白色
+                  strokeWidth: 1     // 預設細線
+              });
+          }
+      });
+  }
+
+  // A. 選取方塊時：讀取參數
+  asset_canvas1.on('selection:created', loadAssetParams);
+  asset_canvas1.on('selection:updated', loadAssetParams);
+  
+  // 取消選取時：隱藏面板 + 全部變回白色
+  asset_canvas1.on('selection:cleared', () => {
+     resetAllStrokes(); 
+     paramEmpty.style.display = 'block'; 
+     paramMain.classList.add('hidden');
+     console.log("取消選取");
+     asset_canvas1.requestRenderAll();
+  });
+
+  function loadAssetParams(e) {
+    // 容錯寫法
+      const activeObj = e.selected ? e.selected[0] : asset_canvas1.getActiveObject();
+      
+      if (!activeObj || !activeObj.effectName) return;
+
+      console.log(`選取素材：${activeObj.effectName}，讀取參數中...`);
+
+      // 🌟 1. 視覺回饋：先重置所有顏色，再將當前物件設為藍色
+      resetAllStrokes();
+      
+      if (activeObj.item(0)) {
+          activeObj.item(0).set({
+              stroke: '#00aaff', // 🔷 設定選取色 (亮藍色)
+              strokeWidth: 2     // 加粗一點讓選取更明顯
+          });
+      }
+      // 🔒 上鎖
+      isRestoring = true;
+
+      // 1. 切換 UI
+      switchEffectUI(activeObj.effectName);
+
+      // 2. 清空面板 (避免髒數據)
+      resetAllParams(); 
+
+      // 3. 填入參數
+      if (activeObj.effectParams) {
+          restorePanelParams(activeObj.effectParams);
+      }
+
+      // 🔓 解鎖
+      setTimeout(() => {
+          isRestoring = false;
+      }, 10);
+  }
+
+  // B. 面板操作時：同步回方塊
+  // 先移除舊的避免重複 (保險起見)
+  paramMain.removeEventListener('input', syncParamsToActiveObject);
+  paramMain.removeEventListener('change', syncParamsToActiveObject);
+  
+  paramMain.addEventListener('input', syncParamsToActiveObject);
+  paramMain.addEventListener('change', syncParamsToActiveObject);
+
+  function syncParamsToActiveObject(e) {
+      // 🛑 檢查鎖
+      if (isRestoring) return;
+
+      const activeObj = asset_canvas1.getActiveObject();
+      if (!activeObj) return;
+
+      const target = e.target;
+      const key = target.id || target.dataset.param;
+      
+      if (key) {
+          if (!activeObj.effectParams) activeObj.effectParams = {};
+
+          if (target.type === 'checkbox' || target.type === 'radio') {
+              activeObj.effectParams[key] = target.checked;
+          } else {
+              activeObj.effectParams[key] = target.value;
+          }
+          console.log(`同步參數 ${key} -> ${activeObj.effectParams[key]}`);
+      }
+  }
+
+  asset_canvas1.requestRenderAll();
+}
+
+// 根據時間軸的 Offset 和 Zoom 更新素材位置
+function updateAssetPositions() {
+  if (!asset_canvas1) return;
+
+  asset_canvas1.getObjects().forEach(obj => {
+    // 只有當物件有記錄 startTime 時才處理
+    if (obj.startTime !== undefined) {
+      // 公式：(物件開始時間 - 時間軸起始時間) / 每像素代表秒數
+      const newLeft = (obj.startTime - timelineOffset) / secondsPerPixel;
+      
+      obj.left = newLeft;
+      // 更新寬度 (ScaleX)
+      if (obj.duration !== undefined) {
+          // 算出現在這個 zoom level 下，這個時間長度應該是多少像素
+          const targetWidthPx = obj.duration / secondsPerPixel;
+          
+          // 更新 ScaleX
+          obj.scaleX = targetWidthPx / obj.width;
+
+          // 找出群組裡的文字物件進行修正
+          const textObj = obj.item(1); 
+          if (textObj) {
+              textObj.set({
+                  scaleX: 1 / obj.scaleX,
+                  scaleY: 1 // Y 軸通常鎖定，設為 1 即可，或 1/obj.scaleY
+              });
+          }
+      }
+      obj.setCoords(); // 更新物件的控制點座標
+    }
+  });
+
+  asset_canvas1.requestRenderAll();
+}
+
+function createAssetOnCanvas(assetName, x, y) {
+    if (!asset_canvas1) return;
+
+    // 1. 建立背景方塊
+    const boxWidth = 100; 
+    const boxHeight = 80; // 高度固定 80
+
+    const bgRect = new fabric.Rect({
+        width: boxWidth,
+        height: boxHeight,
+        fill: '#333333',    
+        stroke: '#ffffff',  
+        strokeWidth: 1,
+        rx: 5,              
+        ry: 5,
+        originX: 'center',  
+        originY: 'center',
+        strokeUniform: true 
+    });
+
+    // 2. 建立文字標籤
+    const textObj = new fabric.Text(assetName, {
+        fontSize: 16,       
+        fill: '#ffffff',    
+        originX: 'center',
+        originY: 'center'
+    });
+
+    // 計算垂直置中的位置
+    const centerY = asset_canvas1.getHeight() / 2;
+
+    // 3. 建立群組
+    const group = new fabric.Group([bgRect, textObj], {
+        left: x,                
+        top: centerY,           
+        originX: 'center',
+        originY: 'center',
+        selectable: true,
+        
+        // 鎖定移動與縮放限制
+        lockMovementY: true,    // 只能左右移動
+        lockScalingY: true,     // 只能左右縮放 
+        lockRotation: true,     // 禁止旋轉 
+        // 選取樣式設定
+        hasBorders: false,
+        // 讓控制項比較好抓
+        cornerColor: 'white',
+        cornerSize: 10,
+        transparentCorners: false,
+        objectCaching: false
+    });
+
+    // 設定控制點可見性：只保留左右兩側 (ml, mr)
+    group.setControlsVisibility({
+        mt: false, // 上中
+        mb: false, // 下中
+        ml: true,  // 左中 (允許)
+        mr: true,  // 右中 (允許)
+        bl: false, // 左下
+        br: false, // 右下
+        tl: false, // 左上
+        tr: false, // 右上
+        mtr: false // 旋轉控制點
+    });
+    // 輔助函式：取得目前這個方塊「左右兩邊的邊界限制」
+    function getSafeBoundaries(activeObj) {
+        let minX = 0; // 最左邊界 (畫布邊緣)
+        let maxX = asset_canvas1.getWidth(); // 最右邊界 (畫布邊緣)
+
+        const activeHalfWidth = (activeObj.width * activeObj.scaleX) / 2;
+        const activeLeftEdge = activeObj.left - activeHalfWidth;
+        const activeRightEdge = activeObj.left + activeHalfWidth;
+
+        asset_canvas1.getObjects().forEach(other => {
+            if (other === activeObj) return; // 跳過自己
+
+            const otherHalfWidth = (other.width * other.scaleX) / 2;
+            const otherLeftEdge = other.left - otherHalfWidth;
+            const otherRightEdge = other.left + otherHalfWidth;
+
+            // 判斷 other 是否在 activeObj 的左邊
+            // 邏輯：如果 other 的中心點在 active 的左邊，我們就視為左側障礙物
+            if (other.left < activeObj.left) {
+                // 找出最靠近 activeObj 的左邊界 (取最大值)
+                if (otherRightEdge > minX) minX = otherRightEdge;
+            }
+            
+            // 判斷 other 是否在 activeObj 的右邊
+            if (other.left > activeObj.left) {
+                // 找出最靠近 activeObj 的右邊界 (取最小值)
+                if (otherLeftEdge < maxX) maxX = otherLeftEdge;
+            }
+        });
+
+        return { minX, maxX };
+    }
+// 設定預設時間長度為 1 秒
+    group.duration = 1; 
+
+    // 計算初始 ScaleX
+    // 公式：目標像素寬度 = 時間長度 / 每像素秒數
+    // ScaleX = 目標像素寬度 / 原始寬度(100)
+    const targetWidthPx = group.duration / secondsPerPixel;
+    group.scaleX = targetWidthPx / group.width;
+
+    // 修正文字變形 (因為剛才改了 scaleX)
+    textObj.set({
+        scaleX: 1 / group.scaleX,
+        scaleY: 1 
+    });
+
+    // -------------------------------------------------------------
+
+    // 設定開始時間
+    group.startTime = timelineOffset + (x * secondsPerPixel);
+
+    // -------------------------------------------------------------
+    // 1. 移動時的防重疊
+    // -------------------------------------------------------------
+    group.on('moving', () => {
+        const bounds = getSafeBoundaries(group);
+        const halfWidth = (group.width * group.scaleX) / 2;
+
+        // 限制左邊：不能超過左側物件的右邊緣
+        if (group.left - halfWidth < bounds.minX) {
+            group.left = bounds.minX + halfWidth;
+        }
+        
+        // 限制右邊：不能超過右側物件的左邊緣
+        if (group.left + halfWidth > bounds.maxX) {
+            group.left = bounds.maxX - halfWidth;
+        }
+
+        // 同步時間 (在位置修正後才計算)
+        group.startTime = timelineOffset + (group.left * secondsPerPixel);
+    });
+
+
+    // -------------------------------------------------------------
+    // 2. 縮放時的防重疊
+    // -------------------------------------------------------------
+    group.on('scaling', () => {
+        const bounds = getSafeBoundaries(group);
+        const halfWidth = (group.width * group.scaleX) / 2;
+
+        // 文字抗拉伸
+        textObj.set({
+            scaleX: 1 / group.scaleX,
+            scaleY: 1 / group.scaleY
+        });
+
+        // 檢查是否碰到左邊界
+        if (group.left - halfWidth < bounds.minX) {
+            // 如果碰到，計算允許的最大寬度
+            // 最大寬度 = (中心點 - 左邊界) * 2
+            const maxAllowedWidth = (group.left - bounds.minX) * 2;
+            // 反推 ScaleX = 最大寬度 / 原始寬度
+            group.scaleX = maxAllowedWidth / group.width;
+            
+            // 修正位置 (避免微小誤差導致穿越)
+            group.left = bounds.minX + (group.width * group.scaleX) / 2;
+        }
+
+        // 檢查是否碰到右邊界
+        if (group.left + halfWidth > bounds.maxX) {
+            const maxAllowedWidth = (bounds.maxX - group.left) * 2;
+            group.scaleX = maxAllowedWidth / group.width;
+            group.left = bounds.maxX - (group.width * group.scaleX) / 2;
+        }
+        // 公式：像素寬度 * 每像素秒數
+        const currentWidthPx = group.width * group.scaleX;
+        group.duration = currentWidthPx * secondsPerPixel;
+        // 同步時間
+        group.startTime = timelineOffset + (group.left * secondsPerPixel);
+    });
+    // 1. 切換 UI 並重置面板 (確保抓到的是乾淨的預設值)
+    switchEffectUI(assetName);
+    resetAllParams();
+
+    // 把素材名稱存進方塊裡
+    group.effectName = assetName;
+
+    // 3. 抓取當前的面板參數 (預設值)，存入方塊
+    group.effectParams = capturePanelParams();
+    const effect_duration = buildSegmentFromUI(group.startTime,group.duration);
+    asset_canvas1.add(group);
+    asset_canvas1.setActiveObject(group);
+    asset_canvas1.fire('selection:created', { target: group, selected: [group] }); 
+    asset_canvas1.requestRenderAll();
+}
+//delete功能
+window.addEventListener('keydown', (e) => {
+    // 1. 檢查按鍵是否為 Delete
+    if (e.key === 'Delete') {
+        
+        // 2. 安全檢查：如果使用者正在輸入框 (input) 或文字區域打字，忽略刪除指令
+        if (document.activeElement.tagName === 'INPUT' || 
+            document.activeElement.tagName === 'TEXTAREA') {
+            return;
+        }
+
+        if (!asset_canvas1) return;
+
+        // 3. 取得目前選取的物件
+        const activeObjects = asset_canvas1.getActiveObjects();
+
+        if (activeObjects.length) {
+            // 清除目前的選取框，避免刪除後殘留藍色框線
+            asset_canvas1.discardActiveObject();
+
+            // 4. 遍歷並移除所有選取的物件
+            activeObjects.forEach((obj) => {
+                asset_canvas1.remove(obj);
+            });
+
+            asset_canvas1.requestRenderAll();
+        }
+    }
+});
+// Initialization
+function initAll() {
+  // UI defaults
+  playToggle.disabled = true;
+  stopBtn.disabled = true;
+  volumeValue.textContent = `${Math.round((volumeSlider.value || 100))}%`;
+
+  // timeline init
+  if (!timelineCanvasEl) {
+    console.error('找不到 #timelineCanvas');
+    return;
+  }
+  timelineCanvasEl.width = timelineCanvasEl.clientWidth;
+  timelineCanvasEl.height = timelineCanvasEl.clientHeight;
+
+  initTimelineFabric();
+  initAsset1Fabric()
+  // set initial audio volume
+  audio.volume = (volumeSlider.value || 100) / 100;
+
+  updateTimeUI();
+}
+
+// start
+initAll();
+
 // 自訂義加入
 const btnAddCustom = document.querySelector('.btn_add_custom');
 const btnUpdateCustom = document.querySelector('.btn_update_custom');
@@ -909,7 +1733,7 @@ function createCustomAssetElement(preset) {
   const div = document.createElement('div');
   div.className = 'Asset_item Asset_item--custom';
   div.dataset.customId = preset._id;
-
+  div.setAttribute('draggable', true);
   const modeLabel = (preset.mode || "").replace(/^MODES_/, "");
   div.textContent = `[自訂] ${modeLabel}`;
 

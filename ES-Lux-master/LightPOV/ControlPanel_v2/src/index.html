@@ -5,10 +5,11 @@
     <title>編招系統</title>
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <link rel="stylesheet" href="./css/style.css"/><!doctype html>
+</head>
 <body>
     <!--menu bar -->
     <header class="menu_bar">
-      <div class="logo">menu bar</div>
+      <div class="content">menu bar</div>
     </header>
 
     <div class = "row1"></div>
@@ -941,29 +942,41 @@
     </div>
     <!--音樂效果控制區-->
     <div class="music_and_effects">
-    <header>
-      <h1>時間軸</h1>
-    </header>
 
-    <section class="controls">
-      <div class="music_file_load">
-        <button id="music_file_load_Btn">選擇音檔</button>
-        <input id="fileInput" type="file" accept="audio/*" hidden />
-      </div>
+        <section class="controls">
+            <div class="music_file_load">
+                <button id="music_file_load_Btn">選擇音檔</button>
+                <input id="fileInput" type="file" accept="audio/*" hidden />
+            </div>
 
-      <div class="player-controls">
-        <button id="playToggle" disabled>▶ 播放</button>
-        <span id="time">00:00 / 00:00</span>
-      </div>
-    </section>
+            <div class="player-controls">
+                <button id="playToggle" disabled>▶ 播放</button>
+                <button id="stopBtn" disabled>⏹ 停止</button>
+                <span id="time">00:00</span>
+            </div>
 
-    <section class="waveform-wrap">
-      <canvas id="waveform" width="900" height="60"></canvas>
-    </section>
+            <div class="time-controls">
+                <div class="content">跳至時間:
+                <input id="minInput" type="number" min="0" /> :
+                <input id="secInput" type="number" min="0" max="59" /> 
+                </div>
+            </div>
 
-    <audio id="audio" controls style="display:none;"></audio>
-  </div>
+            <div class="volume-control">
+                <label for="volumeSlider">🔊 音量：</label>
+                <input type="range" id="volumeSlider" min="0" max="100" value="100">
+                <span id="volumeValue">100%</span>
+            </div>
+        </section>
+        <div id="timeline">
+            <canvas id="timelineCanvas" width="1200" height="160"></canvas>
+            <canvas id="assetCanvas1" width="1200" height="80"></canvas>
+        </div>
 
-  <script src="./js/script.js"></script>
+        <audio id="audio" controls style="display:none;"></audio>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="./js/script.js"></script>
 </body>
 </html>
