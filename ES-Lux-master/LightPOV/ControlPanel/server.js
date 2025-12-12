@@ -9,6 +9,7 @@ var light_state = new Array(NUM_OF_LUX).fill(0);
 var light_effect = new Array(NUM_OF_LUX).fill(0);
 var lux_mode = new Array(NUM_OF_LUX).fill(0);
 var light_reset = new Array(NUM_OF_LUX).fill(0);
+var light_stop = new Array(NUM_OF_LUX).fill(0);
 var EXE_MODE = 0 //0 auto 1 manual
 var SONG = "ESC.json"
 var Time = 0;
@@ -109,7 +110,7 @@ app.get("/esp_time", (req, res) => {
     var now = new Date();
     light_state[id] = now.getTime()
     light_effect[id] = req.query.effect
-    var mode =(light_reset[id]) ? "C" : ((EXE_MODE == 0) ? "A" : "M")
+    var mode =(light_reset[id]) ? "C" : (light_stop[id]) ? "P" : (EXE_MODE == 0) ? "A" : "M"
     res.send(mode + (Time).toString())
 })
 
@@ -168,6 +169,19 @@ app.get("/update_lux_reset", (req, res) => {
     light_reset[id] = reset;  // 更新数组中的值
     res.send("Lux " + id.toString() + " reset: " + reset);
 })
+app.get("/update_lux_stop", (req, res) => {
+    var id = parseInt(req.query.id);
+    var stop = req.query.stop === 'true'; // 将传递的字符串转换为布尔值
+
+    // 检查 id 是否为有效的数组索引
+    if (isNaN(id) || id < 0 || id >= NUM_OF_LUX) {
+        return res.status(400).send("Invalid ID");
+    }
+
+    // reset 已经是一个布尔值了，不需要再检查是否为有效数字
+    light_stop[id] = stop;  // 更新数组中的值
+    res.send("Lux " + id.toString() + " stop: " + stop);
+})
 
 app.post('/fileupload', function (req, res) {
     var uploadedFile = req.files.uploadingFile;
@@ -211,6 +225,37 @@ app.post('/settime', (req, res) => {
     //console.log(`Received time: ${time} ms`);
     res.status(200).send('Time updated');
 });
+
+app.post('/update_file', (req, res) => {
+    const newFile = req.body.file || req.body.path;
+    
+    // 檢查是否有提供檔案位置
+    if (!newFile) {
+        return res.status(400).send('Missing file parameter');
+    }
+    
+    // 檢查檔案是否存在
+    const filePath = "public/" + newFile;
+    if (!fs.existsSync(filePath)) {
+        return res.status(404).send('File not found: ' + filePath);
+    }
+    
+    try {
+        // 更新 SONG 變數
+        SONG = newFile;
+        
+        // 重新讀取檔案並更新 EffectMapData 和 EffectMap
+        EffectMapData = fs.readFileSync(filePath);
+        EffectMap = JSON.parse(EffectMapData);
+        
+        console.log('File updated to: ' + SONG);
+        res.status(200).send('File updated successfully: ' + SONG);
+    } catch (err) {
+        console.error('Error updating file:', err);
+        res.status(500).send('Error updating file: ' + err.message);
+    }
+});
+
 console.log(`Listening on port:${port} `);
 app.listen(port);
 

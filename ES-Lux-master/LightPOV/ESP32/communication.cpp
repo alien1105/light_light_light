@@ -215,7 +215,7 @@ bool Communication::receive(Mode* m, int current_id){
 }
 
 
-time_t Communication::check_start_time(uint8_t id, MODES mode, uint8_t* force_start){
+time_t Communication::check_start_time(uint8_t id, MODES mode, uint8_t* force_mode){
     if (WiFi.status() == WL_CONNECTED){
         /* Request data from server */
         String url ="http://" + WiFi.gatewayIP().toString() +  String(WIFI_TIME_CHECK_URL) + "?id=" + id + "&effect=" + mode;
@@ -227,11 +227,13 @@ time_t Communication::check_start_time(uint8_t id, MODES mode, uint8_t* force_st
             String web_data = http.getString();
             if (web_data.length() > 0) {
                 if (web_data[0] == 'C')
-                    *force_start = 2;
+                    *force_mode = 2;
+                else if (web_data[0] == 'P')
+                    *force_mode = 3;
                 else if (web_data[0] == 'M')
-                    *force_start = 1;
+                    *force_mode = 1;
                 else
-                    *force_start = 0; 
+                    *force_mode = 0; 
                 return web_data.substring(1).toInt();
             }
         }

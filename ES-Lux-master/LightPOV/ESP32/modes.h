@@ -77,7 +77,8 @@ public:
      *     Sequential control     *
      ******************************/
     uint8_t effect_id;
-    uint8_t force_start;
+    /* 0: normal, 1: force start, 2: force restart, 3: force stop */
+    uint8_t force_mode;
 
     void setMusicTime(time_t t);
     time_t getMusicTime();
