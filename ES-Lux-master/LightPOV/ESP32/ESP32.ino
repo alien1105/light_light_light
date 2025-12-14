@@ -8,7 +8,7 @@ TaskHandle_t LED_UPDATE;
 TaskHandle_t WIFI_HANDLE;
 
 Effects effect = Effects();
-Communication comm = Communication();
+Communication comm;
 
 void setup(){
     Serial.begin(115200);
