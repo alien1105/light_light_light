@@ -72,6 +72,7 @@ const paramBody  = document.querySelector('.param_body--param');
 const extraGroups = document.querySelectorAll('.extra_group');
 let currentCustomPresetId = null;   // 目前選中的自訂義 preset 的 _id
 let currentModeStr = "MODES_PLAIN";
+let currentLibraryAssetName = "";
 
 
 // Reset
@@ -99,6 +100,7 @@ function resetAllParams() {
 
 // 切換參數介面
 function switchEffectUI(name) {
+  console.log(`[UI切換] 原始名稱: "${name}"`);
     // 1. 更新當前的模式字串 (供後續儲存使用)
     currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
 
@@ -109,12 +111,10 @@ function switchEffectUI(name) {
     // 3. 根據 EFFECT_CONFIG 決定要顯示哪些額外參數 (Extra Groups)
     const cfg = EFFECT_CONFIG[name] || { extras: [] };
 
-    if (extraGroups) {
-        extraGroups.forEach(g => {
-            const key = g.dataset.extra;
-            g.style.display = cfg.extras.includes(key) ? "block" : "none";
-        });
-    }
+      extraGroups.forEach(g => {
+          const key = g.dataset.extra;
+          g.style.display = cfg.extras.includes(key) ? "block" : "none";
+      });
 
     // 4. 特殊處理：如果是 "清除"，則隱藏面板
     if (name === "清除") {
@@ -227,12 +227,21 @@ assetItems.forEach(item => {
 
     paramEmpty.style.display = 'none';
     paramMain.classList.remove('hidden');
+<<<<<<< HEAD
 
     // 初始化面板
     resetAllParams();
     switchEffectUI(name);
     });
 
+=======
+    
+    // 初始化面板
+    resetAllParams();
+    switchEffectUI(name);
+  });
+    
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
   item.setAttribute('draggable', true);
   item.addEventListener('dragstart', (e) => {
     const name = item.textContent.trim();
@@ -1273,7 +1282,11 @@ function initAsset1Fabric() {
       // 切換 UI
       switchEffectUI(block.name);
       // 清空面板
+<<<<<<< HEAD
       resetAllParams(); 
+=======
+      resetAllParams();
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
       // 填入參數
       if (block.params) {
           restorePanelParams(block.params);
@@ -1292,7 +1305,11 @@ function initAsset1Fabric() {
   paramMain.addEventListener('input', syncParamsToActiveObject);
   paramMain.addEventListener('change', syncParamsToActiveObject);
 
+<<<<<<< HEAD
   function syncParamsToActiveObject(e) {
+=======
+function syncParamsToActiveObject(e) {
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
 
       // 檢查鎖
       if (typeof isRestoring !== 'undefined' && isRestoring) return;
@@ -1335,6 +1352,7 @@ function updateAssetPositions() {
   asset_canvas1.getObjects().forEach(obj => {
     // 1. 檢查有沒有 logicBlock (靈魂)
     if (obj.logicBlock) {
+<<<<<<< HEAD
       
       // ▼▼▼【絕對不能漏掉這一行】▼▼▼
       const block = obj.logicBlock; 
@@ -1361,10 +1379,43 @@ function updateAssetPositions() {
                   scaleX: 1 / obj.scaleX,
                       scaleY: 1 
               });
+=======
+      
+      // ▼▼▼【絕對不能漏掉這一行】▼▼▼
+      const block = obj.logicBlock; 
+      // ▲▲▲ 定義 block 變數，不然下面會報錯 block is not defined ▲▲▲
+
+      // 2. 現在可以使用 block 了
+      if (block.startTime !== undefined) {
+          
+          // 計算新的 X 座標
+          const newLeft = (block.startTime - timelineOffset) / secondsPerPixel;
+          
+          obj.left = newLeft;
+
+          // 3. 更新寬度 (縮放)
+          if (block.duration !== undefined && obj.width > 0) {
+              const targetWidthPx = block.duration / secondsPerPixel;
+              
+              obj.scaleX = targetWidthPx / obj.width;
+
+              // 修正文字變形
+              const textObj = obj.item(1); 
+              if (textObj) {
+                  textObj.set({
+                      scaleX: 1 / obj.scaleX,
+                      scaleY: 1 
+                  });
+              }
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
           }
-      }
           obj.setCoords(); 
       }
+<<<<<<< HEAD
+          obj.setCoords(); 
+      }
+=======
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
     }
   });
 
@@ -1389,8 +1440,13 @@ function createAssetOnCanvas(assetName, x, y) {
         console.log("切換素材，使用預設值");
         // 為了安全，還是要切換UI
         isRestoring = true;
+<<<<<<< HEAD
     switchEffectUI(assetName);
     resetAllParams();
+=======
+        switchEffectUI(assetName);
+        resetAllParams();
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
         finalParams = capturePanelParams();
         isRestoring = false;
     }
@@ -1413,7 +1469,7 @@ function createAssetOnCanvas(assetName, x, y) {
 
     // 選取它
     asset_canvas1.setActiveObject(group);
-    asset_canvas1.fire('selection:created', { target: group, selected: [group] }); 
+    asset_canvas1.fire('selection:created', { target: group, selected: [group] });
     asset_canvas1.requestRenderAll();
 
     console.log(`已建立 Block Class ID: ${newBlock.id}`);
@@ -2194,6 +2250,7 @@ if (btnImport && fileInputImport) {
         };
         reader.readAsText(file);
     });
+<<<<<<< HEAD
 }
 
 // src/js/script.js (放在檔案最後面)
@@ -2342,3 +2399,6 @@ function stopControlPolling() {
 
 // 初始化 UI
 initControlPanelUI();
+=======
+}
+>>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
