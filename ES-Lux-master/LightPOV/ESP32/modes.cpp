@@ -195,7 +195,7 @@ void Effects::lightOnOneLED(CRGB l, int num){
 }
 /*  Perform the effect from buffer */
 void Effects::perform(){
-    if (force_start == 2){
+    if (force_mode == 2){
       effect_id = 0;
       buffer.clean();
     }
@@ -206,7 +206,7 @@ void Effects::perform(){
       }
     Mode m;
     buffer.peek(&m);
-    if (m.start_time < getMusicTime() || force_start == 1){
+    if (m.start_time < getMusicTime() || force_mode == 1){
         // Load new mode
         buffer.pop(&m);
         Serial.print("Now Performing: ");
@@ -276,13 +276,15 @@ uint16_t Effects::getIdx(){
 
 /* Check whether to stop */
 bool Effects::checkDuration(Mode* m){
-    Serial.println(getMusicTime());
-    return //millis() - effect_entry_time < m->duration/*
-    //|| getMusicTime() > m->start_time + m->duration*/;
-    ///* ||
-        (force_start!=2 && getMusicTime() < m->start_time + m->duration)
-    //    */
-        ;
+    //Serial.println(getMusicTime());
+    if (getMusicTime() < m->start_time) {
+        force_mode = 2;
+        return false;
+    }
+    while (force_mode == 3){
+        delay(100);
+    }
+    return (force_mode!=2 && getMusicTime() < m->start_time + m->duration);
 }
 
 void inline Effects::showLED(){
