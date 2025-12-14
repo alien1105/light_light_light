@@ -74,7 +74,6 @@ let currentCustomPresetId = null;   // 目前選中的自訂義 preset 的 _id
 let currentModeStr = "MODES_PLAIN";
 let currentLibraryAssetName = "";
 
-
 // Reset
 function resetAllParams() {
   paramMain.querySelectorAll('input').forEach(inp => {
@@ -227,21 +226,12 @@ assetItems.forEach(item => {
 
     paramEmpty.style.display = 'none';
     paramMain.classList.remove('hidden');
-<<<<<<< HEAD
-
-    // 初始化面板
-    resetAllParams();
-    switchEffectUI(name);
-    });
-
-=======
     
     // 初始化面板
     resetAllParams();
     switchEffectUI(name);
   });
     
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
   item.setAttribute('draggable', true);
   item.addEventListener('dragstart', (e) => {
     const name = item.textContent.trim();
@@ -353,26 +343,14 @@ document.querySelectorAll('.extra_group').forEach(group => {
 // 切換（參數 / 控制）
 document.querySelectorAll('.param_tab').forEach(tab => {
   tab.addEventListener('click', () => {
-        const mode = tab.dataset.mode; // 'param' 或 'control'
+    const mode = tab.dataset.mode;
 
-        // 1. 切換按鈕的高亮狀態
     document.querySelectorAll('.param_tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
 
-        // 2. 切換面板內容顯示
-        document.querySelectorAll('.param_body').forEach(body => {
-            body.classList.toggle('active', body.classList.contains(`param_body--${mode}`));
+    document.querySelectorAll('.param_body').forEach(b => {
+      b.classList.toggle('active', b.classList.contains(`param_body--${mode}`));
     });
-
-        // 3. 核心佈局切換：控制左側隱藏與右側置右
-        const row2 = document.querySelector('.row2');
-        if (mode === 'control') {
-            row2.classList.add('mode-control');
-            startControlPolling(); // 開始向 server.js 請求資料
-        } else {
-            row2.classList.remove('mode-control');
-            stopControlPolling(); // 停止請求
-        }
   });
 });
 
@@ -581,30 +559,18 @@ function buildEffectConfigFromUI() {
 // const obj = buildEffectConfigFromUI();
 // const jsonStr = JSON.stringify(obj, null, 2);
 
-function sendToSettime() {
+function sendToSettime(jsonPath) {
   const currentPlaybackTime = 0; 
 
   fetch('/settime', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      time : currentPlaybackTime
+      path: jsonPath,
+      current_time: currentPlaybackTime
     })
   })
 }
-
-function sendToPath(jsonPath) {
-
-  fetch('/update_file', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      time : currentPlaybackTime
-    })
-  })
-}
-
-
 
 // Audio / waveform state
 let audioCtx = null;
@@ -1282,11 +1248,7 @@ function initAsset1Fabric() {
       // 切換 UI
       switchEffectUI(block.name);
       // 清空面板
-<<<<<<< HEAD
-      resetAllParams(); 
-=======
       resetAllParams();
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
       // 填入參數
       if (block.params) {
           restorePanelParams(block.params);
@@ -1305,11 +1267,7 @@ function initAsset1Fabric() {
   paramMain.addEventListener('input', syncParamsToActiveObject);
   paramMain.addEventListener('change', syncParamsToActiveObject);
 
-<<<<<<< HEAD
-  function syncParamsToActiveObject(e) {
-=======
 function syncParamsToActiveObject(e) {
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
 
       // 檢查鎖
       if (typeof isRestoring !== 'undefined' && isRestoring) return;
@@ -1362,32 +1320,6 @@ function updateAssetPositions() {
           
           // 計算新的 X 座標
           const newLeft = (block.startTime - timelineOffset) / secondsPerPixel;
-      
-      obj.left = newLeft;
-          
-          // 3. 更新寬度 (縮放)
-          if (block.duration !== undefined && obj.width > 0) {
-              const targetWidthPx = block.duration / secondsPerPixel;
-              
-          obj.scaleX = targetWidthPx / obj.width;
-
-              // 修正文字變形
-          const textObj = obj.item(1); 
-          if (textObj) {
-              textObj.set({
-                  scaleX: 1 / obj.scaleX,
-                      scaleY: 1 
-              });
-      
-      // ▼▼▼【絕對不能漏掉這一行】▼▼▼
-      const block = obj.logicBlock; 
-      // ▲▲▲ 定義 block 變數，不然下面會報錯 block is not defined ▲▲▲
-
-      // 2. 現在可以使用 block 了
-      if (block.startTime !== undefined) {
-          
-          // 計算新的 X 座標
-          const newLeft = (block.startTime - timelineOffset) / secondsPerPixel;
           
           obj.left = newLeft;
 
@@ -1405,15 +1337,9 @@ function updateAssetPositions() {
                       scaleY: 1 
                   });
               }
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
           }
           obj.setCoords(); 
       }
-<<<<<<< HEAD
-          obj.setCoords(); 
-      }
-=======
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
     }
   });
 
@@ -1438,13 +1364,8 @@ function createAssetOnCanvas(assetName, x, y) {
         console.log("切換素材，使用預設值");
         // 為了安全，還是要切換UI
         isRestoring = true;
-<<<<<<< HEAD
-    switchEffectUI(assetName);
-    resetAllParams();
-=======
         switchEffectUI(assetName);
         resetAllParams();
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
         finalParams = capturePanelParams();
         isRestoring = false;
     }
@@ -2392,6 +2313,3 @@ function stopControlPolling() {
 
 // 初始化 UI
 initControlPanelUI();
-=======
-}
->>>>>>> f43a1f02fb670c763e24d7fd62dd516ed2877e07
