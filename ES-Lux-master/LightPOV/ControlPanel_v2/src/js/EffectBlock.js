@@ -31,10 +31,10 @@ class EffectBlock {
      * 在畫布上渲染方塊
      * @param {fabric.Canvas} canvas - 目標畫布
      * @param {number} x - 放置的 X 座標
-     * @param {number} y - 放置的 Y 座標 (通常由外部計算好傳入)
+     * @param {number} y - 放置的 Y 座標
      */
     render(canvas, x, y) {
-        // 1. 建立背景方塊
+        // 建立背景方塊
         const boxWidth = 100;
         const boxHeight = 80;
         const bgRect = new fabric.Rect({
@@ -44,16 +44,16 @@ class EffectBlock {
             originX: 'center', originY: 'center', strokeUniform: true
         });
 
-        // 2. 建立文字
+        // 建立文字
         const textObj = new fabric.Text(`${this.name}`, {
             fontSize: 16, fill: '#ffffff',
             originX: 'center', originY: 'center'
         });
 
-        // 3. 建立群組
+        // 建立群組
         this.fabricGroup = new fabric.Group([bgRect, textObj], {
             left: x, top: y, // 使用傳入的 y
-            originX: 'center', originY: 'center',
+            originX: 'left', originY: 'center',
             selectable: true,
             lockMovementY: true, lockScalingY: true, lockRotation: true,
             hasBorders: false, cornerColor: 'white', cornerSize: 10,
@@ -90,44 +90,48 @@ class EffectBlock {
         // 移動時
         group.on('moving', () => {
             const bounds = this._getSafeBoundaries(canvas);
-            const halfWidth = (group.width * group.scaleX) / 2;
+            const currentWidth = group.getScaledWidth();
 
-            if (group.left - halfWidth < bounds.minX) group.left = bounds.minX + halfWidth;
-            if (group.left + halfWidth > bounds.maxX) group.left = bounds.maxX - halfWidth;
+            if (group.left < bounds.minX) group.left = bounds.minX;
+            if (group.left + currentWidth > bounds.maxX) group.left = bounds.maxX - currentWidth;
 
-            // 更新時間
+            // 更新內部時間
             this.startTime = timelineOffset + (group.left * secondsPerPixel);
-            // 更新時間相關欄位，保留原本的參數
-            /*if (window.globalEffectData[this.id]) {
+
+            // 即時寫入資料庫
+            if (window.globalEffectData[this.id]) {
                 window.globalEffectData[this.id].startTime = this.startTime;
-            
-            }*/
+            }
+           
         });
 
         // 縮放時
         group.on('scaling', () => {
             const bounds = this._getSafeBoundaries(canvas);
-            const halfWidth = (group.width * group.scaleX) / 2;
+            const currentWidth = group.getScaledWidth();
 
             // 抗文字拉伸
             textObj.set({ scaleX: 1 / group.scaleX, scaleY: 1 / group.scaleY });
 
             // 邊界檢查
-            if (group.left - halfWidth < bounds.minX) {
-                const maxW = (group.left - bounds.minX) * 2;
-                group.scaleX = maxW / group.width;
-                group.left = bounds.minX + (group.width * group.scaleX) / 2;
+            if (group.left  < bounds.minX) {
+                group.left = bounds.minX 
             }
-            if (group.left + halfWidth > bounds.maxX) {
-                const maxW = (bounds.maxX - group.left) * 2;
-                group.scaleX = maxW / group.width;
-                group.left = bounds.maxX - (group.width * group.scaleX) / 2;
+            if (group.left + currentWidth > bounds.maxX) {
+                // 如果右邊撞牆，限制寬度
+                const maxWidth = bounds.maxX - group.left;
+                group.scaleX = maxWidth / group.width;
             }
 
             // 更新 Duration 與 Time
-            const currentWidthPx = group.width * group.scaleX;
-            this.duration = currentWidthPx * secondsPerPixel;
+            this.duration = group.getScaledWidth() * secondsPerPixel;
             this.startTime = timelineOffset + (group.left * secondsPerPixel);
+
+            // 即時寫入資料庫
+            if (window.globalEffectData[this.id]) {
+                window.globalEffectData[this.id].startTime = this.startTime;
+                window.globalEffectData[this.id].duration = this.duration;
+            }
         });
     }
 
@@ -139,15 +143,19 @@ class EffectBlock {
 
         canvas.getObjects().forEach(other => {
             if (other === activeObj) return;
+            if (!other.logicBlock) return;
 
-            const otherHalfWidth = (other.width * other.scaleX) / 2;
-            if (other.left < activeObj.left) {
-                const edge = other.left + otherHalfWidth;
-                if (edge > minX) minX = edge;
+            const otherLeft = other.left;
+            const otherRight = other.left + other.getScaledWidth();
+            const activeLeft = activeObj.left;
+
+            // 如果對方在我的左邊
+            if (otherRight <= activeLeft) {
+                if (otherRight > minX) minX = otherRight;
             }
-            if (other.left > activeObj.left) {
-                const edge = other.left - otherHalfWidth;
-                if (edge < maxX) maxX = edge;
+            // 如果對方在我的右邊
+            if (otherLeft >= activeLeft) {
+                if (otherLeft < maxX) maxX = otherLeft;
             }
         });
         return { minX, maxX };

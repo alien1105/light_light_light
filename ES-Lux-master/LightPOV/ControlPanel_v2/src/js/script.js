@@ -72,6 +72,7 @@ const paramBody  = document.querySelector('.param_body--param');
 const extraGroups = document.querySelectorAll('.extra_group');
 let currentCustomPresetId = null;   // 目前選中的自訂義 preset 的 _id
 let currentModeStr = "MODES_PLAIN";
+let currentLibraryAssetName = "";
 
 // Reset
 function resetAllParams() {
@@ -205,33 +206,32 @@ function capturePanelParams() {
     return params;
 }
 
-// 點素材 顯示對應參數
+// 點素材顯示對應參數
 assetItems.forEach(item => {
   item.addEventListener('click', () => {
     const name = item.textContent.trim();
+    // 記錄目前選中的素材名稱
+    currentLibraryAssetName = name; 
 
+    // 取消畫布上的選取
+    if (asset_canvas1) {
+        asset_canvas1.discardActiveObject();
+        asset_canvas1.requestRenderAll();
+        currentEditingId = null; // 清空編輯ID，告訴 syncParams 不要存檔
+    }
+    // 3. UI 切換與重置 (給使用者一個乾淨的開始調整)
     currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
-
     document.querySelectorAll('.Asset_item').forEach(i => i.classList.remove('active'));
     item.classList.add('active');
 
     paramEmpty.style.display = 'none';
     paramMain.classList.remove('hidden');
-    paramBody.scrollTop = 0;
-
+    
+    // 初始化面板
     resetAllParams();
-
-    const cfg = EFFECT_CONFIG[name] || { extras: [] };
-
-    extraGroups.forEach(g => {
-      const key = g.dataset.extra;
-      g.style.display = cfg.extras.includes(key) ? "block" : "none";
-    });
-
-    if (name === "清除") {
-      paramMain.classList.add('hidden');
-    }
+    switchEffectUI(name);
   });
+    
   item.setAttribute('draggable', true);
   item.addEventListener('dragstart', (e) => {
     const name = item.textContent.trim();
@@ -1160,6 +1160,19 @@ function updateTimeUI() {
   volumeValue.textContent = `${Math.round(audio.volume * 100)}%`;
 }
 
+//重置效果方塊外框
+function resetAllStrokes() {
+      asset_canvas1.getObjects().forEach(obj => {
+          // 確保它是 Group 且內部有背景方塊 (item(0))
+          if (obj.type === 'group' && obj.item(0)) {
+              obj.item(0).set({
+                  stroke: '#ffffff', // 預設白色
+                  strokeWidth: 1     // 預設細線
+              });
+          }
+      });
+  }
+
 // 初始化 Asset Canvas1 的 Fabric 畫布
 function initAsset1Fabric() {
   if (!assetCanvas1El) {
@@ -1196,17 +1209,6 @@ function initAsset1Fabric() {
     createAssetOnCanvas(assetName, pointer.x, pointer.y);
   });
   // 事件監聽整合區
-  function resetAllStrokes() {
-      asset_canvas1.getObjects().forEach(obj => {
-          // 確保它是 Group 且內部有背景方塊 (item(0))
-          if (obj.type === 'group' && obj.item(0)) {
-              obj.item(0).set({
-                  stroke: '#ffffff', // 預設白色
-                  strokeWidth: 1     // 預設細線
-              });
-          }
-      });
-  }
 
   // 選取方塊時：讀取參數
   asset_canvas1.on('selection:created', loadAssetParams);
@@ -1266,46 +1268,36 @@ function initAsset1Fabric() {
   paramMain.addEventListener('change', syncParamsToActiveObject);
 
 function syncParamsToActiveObject(e) {
-      console.log("--- [DEBUG] 觸發存檔流程 ---");
 
-      // 1. 檢查鎖
-      if (isRestoring) {
-          console.warn("❌ 存檔被阻擋：isRestoring 為 true (正在還原參數中，忽略本次變更)");
+      // 檢查鎖
+      if (typeof isRestoring !== 'undefined' && isRestoring) return;
+
+      // 如果目前沒有正在編輯的 Canvas ID，就不執行存檔，直接 return，讓數值保留在輸入框裡
+      if (!currentEditingId) {
           return;
       }
 
-      // 2. 檢查選取物件
+      // 檢查選取物件
       const activeObj = asset_canvas1.getActiveObject();
       if (!activeObj || !activeObj.logicBlock) {
-          console.warn("❌ 存檔被阻擋：沒有選取物件，或物件缺少 logicBlock");
           return;
       }
 
       const block = activeObj.logicBlock;
-      console.log(`ℹ️ 當前物件 ID: ${block.id}, 面板紀錄 ID: ${currentEditingId}`);
 
-      // 3. 檢查 ID 是否匹配
-      if (block.id !== currentEditingId) {
-        console.error(`❌ 存檔嚴重錯誤：選取 ID(${block.id}) 與面板 ID(${currentEditingId}) 不符！`);
+      // 檢查 ID 是否匹配
+      if (block.id !== currentEditingId) {;
         return;
     }
 
-      // 4. 嘗試抓取參數
+      // 嘗試抓取參數
       const currentParams = capturePanelParams();
       console.log("🔎 抓取到的參數內容:", currentParams);
 
-      if (Object.keys(currentParams).length === 0) {
-          console.error("⚠️ 警告：抓到的參數是空的 ({})！請檢查 HTML input 是否有 id 或 data-param 屬性。");
-      }
 
-      // 5. 寫入資料庫
-      try {
-          block.params = currentParams;
-          console.log(`✅ 成功寫入 ID:${block.id}。資料庫目前狀態:`, globalEffectData);
-      } catch (err) {
-          console.error("❌ 寫入資料庫時發生崩潰 (ReferenceError?):", err);
-          console.error("可能原因：EffectBlock.js 讀取不到 globalEffectData 變數 (作用域問題)。");
-      }
+      // 寫入資料庫
+      block.params = currentParams;
+      console.log(`✅ 成功寫入 ID:${block.id}。資料庫目前狀態:`, globalEffectData);
   }
 
   asset_canvas1.requestRenderAll();
@@ -1358,17 +1350,28 @@ function createAssetOnCanvas(assetName, x, y) {
     if (!asset_canvas1) return;
     // 產生 ID
     const currentId = globalAssetIdCounter++;
-    // 避免這裡的 reset 誤觸發 sync，把舊方塊洗白
-    isRestoring = true;
-    // 準備預設參數
-    switchEffectUI(assetName);
-    resetAllParams();
-    const defaultParams = capturePanelParams();
-    // 抓完參數後，解鎖
-    isRestoring = false;
+
+    // 準備參數
+    let finalParams = {};
+
+    // 如果拖曳進來的素材等於目前面板顯示的素材就直接抓取面板上的數值，不要 reset
+    if (assetName.trim() === currentLibraryAssetName) {
+        console.log("使用面板目前的設定建立方塊");
+        finalParams = capturePanelParams();
+    } 
+    else {
+        // 如果不一樣，就進行切換並重置
+        console.log("切換素材，使用預設值");
+        // 為了安全，還是要切換UI
+        isRestoring = true;
+        switchEffectUI(assetName);
+        resetAllParams();
+        finalParams = capturePanelParams();
+        isRestoring = false;
+    }
     // 先將資料寫入全域資料庫
     globalEffectData[currentId] = {
-      ...defaultParams,
+      ...finalParams,
       id: currentId,         
       name: assetName.trim()  
     }; 
@@ -1904,19 +1907,50 @@ function generateProjectJson() {
 
 // 綁定按鈕事件
 const btnExport = document.getElementById('btn_export_json');
+
 if (btnExport) {
-    btnExport.addEventListener('click', () => {
+    // 這裡加上 async 因為 showSaveFilePicker 是非同步的
+    btnExport.addEventListener('click', async () => {
+        
         // 生成資料
         const data = generateProjectJson();
         const jsonStr = JSON.stringify(data, null, 2); // 美化縮排
 
-        // 建立下載連結
+        // 嘗試使用現代 API (跳出「另存新檔」視窗)
+        if (window.showSaveFilePicker) {
+            try {
+                const handle = await window.showSaveFilePicker({
+                    suggestedName: 'effect_project.json', // 預設檔名
+                    types: [{
+                        description: 'JSON Project File',
+                        accept: { 'application/json': ['.json'] },
+                    }],
+                });
+                
+                // 使用者選好位置後，寫入檔案
+                const writable = await handle.createWritable();
+                await writable.write(jsonStr);
+                await writable.close();
+                
+                console.log(`[匯出成功] 檔案已儲存`);
+                return; // 成功後直接結束
+            } catch (err) {
+                // 如果使用者按「取消」就不做任何事
+                if (err.name === 'AbortError') return;
+                console.warn("SaveFilePicker 失敗或不支援，改用舊方法下載", err);
+            }
+        }
+
+        // 如果 API 不支援，則詢問檔名並下載
+        const userFilename = prompt("請輸入檔案名稱 (無需副檔名):", "effect_project");
+        if (!userFilename) return; // 使用者按取消
+
         const blob = new Blob([jsonStr], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         
         a.href = url;
-        a.download = "effect_project.json"; // 預設檔名
+        a.download = `${userFilename}.json`; // 使用輸入的檔名
         document.body.appendChild(a);
         a.click();
         
@@ -1924,6 +1958,215 @@ if (btnExport) {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        console.log(`[匯出成功] 共匯出 ${data.length} 個區塊`);
+        console.log(`[匯出成功] 下載至預設資料夾`);
+    });
+}
+// JSON 匯入功能 (Import from JSON)
+
+// HSV 參數解包器 (將 JSON 結構轉回平面參數)
+function unpackHsvToParams(prefix, hsvData) {
+    if (!hsvData) return {};
+    const params = {};
+    
+    // 反查 Function 代碼
+    const FUNC_CODE_INV = {
+        0: "none", 1: "const", 2: "ramp", 3: "tri", 4: "pulse", 5: "step"
+    };
+    const funcName = FUNC_CODE_INV[hsvData.func] || "none";
+    
+    params[`${prefix}_func`] = funcName;
+    params[`${prefix}_range`] = hsvData.range || 0;
+    params[`${prefix}_lower`] = hsvData.lower || 0;
+    
+    // 根據 Function 還原特定欄位
+    const p1 = hsvData.p1 || 0;
+    const p2 = hsvData.p2 || 0;
+
+    switch (hsvData.func) {
+        case 1: // Const (p1=value)
+            params[`${prefix}_value`] = p1;
+            break;
+        case 2: // Ramp (p1=upper)
+        case 3: // Tri
+            params[`${prefix}_upper`] = p1;
+            break;
+        case 4: // Pulse (p1=top)
+            params[`${prefix}_top`] = p1;
+            break;
+        case 5: // Step (p1=height, p2=step)
+            params[`${prefix}_height`] = p1;
+            params[`${prefix}_step`] = p2;
+            break;
+    }
+    return params;
+}
+
+// 額外參數解包器 (將 p1~p4 轉回 bladeCount, length...)
+function unpackExtrasToParams(modeStr, p1, p2, p3, p4) {
+    const params = {};
+    
+    // 輔助函式：從 255 反推回原始區間
+    const f = (v255, min, max) => from255(v255, min, max);
+
+    switch (modeStr) {
+        case "MODES_SQUARE":
+            params.boxsize = f(p3, 0, 300);
+            break;
+        case "MODES_SICKLE":
+            params.position_fix = f(p1, 0, 255);
+            params.curvature    = f(p3, 0, 100);
+            params.length       = f(p4, 0, 300);
+            break;
+        case "MODES_FAN":
+            params.curvature  = f(p1, 0, 100);
+            params.bladeCount = f(p3, 0, 12);
+            params.length     = f(p4, 0, 300);
+            break;
+        case "MODES_BOXES":
+            params.boxsize = f(p3, 0, 300);
+            params.space   = f(p4, 0, 100);
+            break;
+        case "MODES_CMAP_DNA":
+            params.reverse = (p1 >= 128); // Boolean
+            params.space   = f(p4, 0, 100);
+            break;
+        case "MODES_CMAP_FIRE":
+            params.space = f(p4, 0, 100);
+            break;
+    }
+    return params;
+}
+
+// 主要匯入函式
+function importProjectFromJson(jsonArray) {
+    if (!Array.isArray(jsonArray)) {
+        alert("格式錯誤：JSON 必須是陣列");
+        return;
+    }
+
+    // 刪除所有方塊
+    if (asset_canvas1) {
+        asset_canvas1.clear();
+        // 重設全域變數
+        window.globalEffectData = {};
+        currentEditingId = null;
+        
+        // 隱藏參數面板
+        if (paramEmpty) paramEmpty.style.display = 'block'; 
+        if (paramMain) paramMain.classList.add('hidden');
+    }
+
+    // 逐一重建方塊
+    jsonArray.forEach(blockData => {
+        // 準備基本資料
+        const modeStr = blockData.mode || "MODES_PLAIN";
+        const assetName = MODE_MAP_INV[modeStr] || "純色"; // 反查中文名 (如 "扇形")
+        const currentId = globalAssetIdCounter++; // 產生新 ID
+        
+        // 時間轉換 (毫秒 -> 秒)
+        const startTimeSec = (blockData.start_time || 0) / 1000;
+        const durationSec  = (blockData.duration || 0) / 1000;
+
+        // 解包參數
+        let restoredParams = {};
+        
+        // 解包 HSV
+        ["XH", "XS", "XV", "YH", "YS", "YV"].forEach(key => {
+            const hsvParams = unpackHsvToParams(key, blockData[key]);
+            Object.assign(restoredParams, hsvParams);
+        });
+
+        // 解包 Extras
+        const extrasParams = unpackExtrasToParams(modeStr, blockData.p1, blockData.p2, blockData.p3, blockData.p4);
+        Object.assign(restoredParams, extrasParams);
+
+        // 寫入資料庫
+        window.globalEffectData[currentId] = {
+            ...restoredParams,
+            id: currentId,
+            name: assetName,
+            startTime: startTimeSec,
+            duration: durationSec
+        };
+
+        // 在畫布上建立實體
+        const newBlock = new EffectBlock(currentId, assetName);
+        
+        // 設定時間
+        newBlock.startTime = startTimeSec;
+        newBlock.duration = durationSec;
+
+        // 計算對應的 X 座標
+        const targetX = (startTimeSec - timelineOffset) / secondsPerPixel;
+        const centerY = asset_canvas1.getHeight() / 2;
+
+        // 渲染
+        const group = newBlock.render(asset_canvas1, targetX, centerY);
+        
+        // render內部會根據預設寬度重算 duration，我們要強制用存檔的 duration 來縮放
+        newBlock.duration = durationSec;
+        newBlock.updateDimensionsFromTime(); // 這是 EffectBlock 裡的方法，讓寬度符合 duration
+        group.setCoords();
+    });
+
+    asset_canvas1.requestRenderAll();
+    console.log(`[匯入成功] 共還原 ${jsonArray.length} 個方塊`);
+}
+
+// 綁定匯入按鈕事件
+const btnImport = document.getElementById('btn_import_json');
+const fileInputImport = document.getElementById('import_file_input');
+
+if (btnImport && fileInputImport) {
+    // 點擊按鈕觸發 input
+    btnImport.addEventListener('click', () => {
+        fileInputImport.value = ''; // 清空以允許重複選同一檔
+        fileInputImport.click();
+    });
+
+    // 檔案選擇後處理
+    fileInputImport.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            try {
+                const rawData = JSON.parse(evt.target.result);
+                let finalData = [];
+
+                // 檢查是否為陣列
+                if (Array.isArray(rawData)) {
+                    
+                    // 偵測是否為 2D 陣列 (檢查第一個元素是不是也是陣列)
+                    if (rawData.length > 0 && Array.isArray(rawData[0])) {
+                        console.log("⚠️ 偵測到 2D 陣列！正在自動攤平 (Flatten)...");
+                        
+                        // 使用 .flat() 將 [[A,B], [C,D]] 變成 [A,B,C,D]
+                        finalData = rawData.flat(); 
+                        
+                        alert(`偵測到多層資料結構，已自動合併 ${rawData.length} 組資料，共 ${finalData.length} 個方塊。`);
+                    } 
+                    // 否則就是標準的 1D 陣列
+                    else {
+                        console.log("✅ 偵測到標準 1D 陣列");
+                        finalData = rawData;
+                    }
+
+                    // 執行匯入
+                    importProjectFromJson(finalData);
+
+                } else {
+                    // 如果根本不是陣列 (例如是單純的 Object)
+                    alert("匯入失敗：JSON 格式不符 (根節點必須是 Array)");
+                    console.error("收到錯誤格式:", rawData);
+                }
+
+            } catch (err) {
+                console.error("JSON 解析失敗", err);
+                alert("匯入失敗：檔案格式錯誤或損毀");
+            }
+        };
+        reader.readAsText(file);
     });
 }
