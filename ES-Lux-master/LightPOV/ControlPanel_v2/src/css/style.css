@@ -33,9 +33,13 @@ body {
     box-sizing: border-box;
 
     display: grid;
-    grid-template-columns: 260px minmax(0, 1fr) 320px;
+    /* 預設狀態：左 300px | 中 1fr | 右 320px */
+    grid-template-columns: 300px 1fr 320px;
+    transition: all 0.3s ease; /* 讓切換時有平滑感 */
+    overflow: hidden;
     column-gap: 20px;
 }
+
 /* 效果預覽區 */
 
 
@@ -370,6 +374,115 @@ body {
     outline: 2px solid #4fb3d6;
 }
 
+/* --- 控制面板表格樣式 (依照您的手繪圖) --- */
+.control_table_header {
+    display: grid;
+    /* 定義欄位寬度: ID | State | Time | Mode | Rst */
+    grid-template-columns: 30px 60px 1fr 50px 30px; 
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid #444;
+    font-size: 13px;
+    color: #aaa;
+    text-align: center;
+}
+
+.control_row {
+    display: grid;
+    grid-template-columns: 30px 60px 1fr 50px 30px;
+    gap: 10px;
+    padding: 10px 4px;
+    border-bottom: 1px solid #2a2a2a;
+    align-items: center;
+    text-align: center;
+    font-size: 14px;
+}
+
+.control_row:hover {
+    background: #252525;
+}
+
+/* 狀態燈號文字 */
+.state_text {
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 4px;
+}
+.state_text.connected {
+    color: #4fd677; /* 綠色 */
+    background: rgba(79, 214, 119, 0.1);
+}
+.state_text.disconnected {
+    color: #ff5555; /* 紅色 */
+    background: rgba(255, 85, 85, 0.1);
+}
+
+.time_text {
+    font-family: monospace;
+    color: #ddd;
+    font-size: 13px;
+}
+
+.mode_select {
+    width: 100%;
+    background: #111;
+    color: #eee;
+    border: 1px solid #444;
+    border-radius: 4px;
+    padding: 2px;
+    text-align: center;
+}
+
+.rst_check {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+    accent-color: #4fb3d6; 
+}
+
+/* --- 版面切換邏輯 (Layout Switching) --- */
+
+/* 當切換到「控制模式」時 */
+.row2.mode-control {
+    /* 左側變成 0 (隱藏) | 中間彈性縮放 | 右側維持 320px 且置右 */
+    grid-template-columns: 1fr 500px;
+}
+
+/* 隱藏左側素材庫的內容，防止寬度撐開 */
+.row2.mode-control .Asset_library {
+    display: none;
+    visibility: hidden;
+}
+
+/* 確保控制面板內部內容不會溢出 */
+.param_panel {
+    width: 100%; /* 填滿 grid 的右邊那一格 (320px) */
+    border-left: 1px solid #333;
+    background-color: #1a1a1a;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 調整表格寬度，確保在 320px 內不擁擠 */
+.control_table_header,
+.control_row {
+    display: grid;
+    /* ID(30) | State(50) | Time(彈性) | Mode(55) | Rst(30) */
+    grid-template-columns: 30px 50px 1fr 55px 30px; 
+    gap: 4px;
+    padding: 8px 5px;
+    align-items: center;
+}
+
+/* 預覽區 (中間) */
+.preview_area {
+    background: #000;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
 
 /* 音樂控制區 */
 .music_and_effects {

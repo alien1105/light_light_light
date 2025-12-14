@@ -559,18 +559,76 @@ function buildEffectConfigFromUI() {
 // const obj = buildEffectConfigFromUI();
 // const jsonStr = JSON.stringify(obj, null, 2);
 
-function sendToSettime(jsonPath) {
-  const currentPlaybackTime = 0; 
+function startServerTimeSync() {
+    if (window.timeSyncInterval) return;
 
-  fetch('/settime', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      path: jsonPath,
-      current_time: currentPlaybackTime
-    })
-  })
+    window.timeSyncInterval = setInterval(() => {
+        const audio = document.getElementById('audio');
+        
+        // 如果 audio 元素存在
+        if (audio) {
+            const currentTimeMs = Math.floor(audio.currentTime * 1000);
+
+            fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    time: currentTimeMs 
+                })
+            })
+        }
+    }, 50); 
 }
+
+const importBtn = document.getElementById('btn_import_json');
+const importInput = document.getElementById('import_file_input');
+
+if (importBtn && importInput) {
+    // 1. 點擊按鈕時，觸發隱藏的 input 點擊事件
+    importBtn.addEventListener('click', () => {
+        importInput.value = ''; // 清空 value，確保選同一個檔案也能觸發 change
+        importInput.click();
+    });
+
+    // 2. 當使用者選好檔案後
+    importInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 注意：瀏覽器基於安全性，通常只拿得到檔名 (file.name)，拿不到完整路徑
+        // 如果您是在本地環境執行 Server 且檔案都在專案資料夾內，傳送檔名即可
+        const fileName = file.name; 
+
+        console.log("準備切換設定檔為:", fileName);
+
+        // 3. 發送請求給 Server 切換檔案
+        fetch('/update_file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file: fileName
+            })
+        })
+        .then(async (res) => {
+            if (res.ok) {
+                console.log("Server 成功切換設定檔！");
+                alert(`成功載入設定檔：${fileName}`);
+                // 這裡建議重新整理頁面，讓前端重新抓取新的 EffectMap
+                // location.reload(); 
+            } else {
+                const errMsg = await res.text();
+                console.error("切換失敗:", errMsg);
+                alert("匯入失敗，請確認 Server 找得到該檔案。\n錯誤訊息: " + errMsg);
+            }
+        })
+    });
+}
+
+
+// 頁面載入後自動啟動同步
+document.addEventListener('DOMContentLoaded', () => {
+    startServerTimeSync();
+});
 
 // Audio / waveform state
 let audioCtx = null;
@@ -2207,3 +2265,146 @@ if (btnImport && fileInputImport) {
         reader.readAsText(file);
     });
 }
+
+// 控制面板邏輯
+
+const NUM_LUX_DEVICES = 5; // 燈具數量
+const row2Container = document.querySelector('.row2');
+const controlListContainer = document.getElementById('control_list_container');
+let controlPollingInterval = null;
+
+// 1. 監聽 Tab 切換 (包含版面變形)
+document.querySelectorAll('.param_tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        const mode = tab.dataset.mode;
+        
+        // UI Tab 切換
+        document.querySelectorAll('.param_tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+
+        document.querySelectorAll('.param_body').forEach(b => {
+            b.classList.toggle('active', b.classList.contains(`param_body--${mode}`));
+        });
+
+        // 版面變形與資料輪詢
+        if (mode === 'control') {
+            row2Container.classList.add('mode-control'); // 觸發 CSS 變形
+            startControlPolling(); // 開始跟 Server 要資料
+        } else {
+            row2Container.classList.remove('mode-control'); // 還原
+            stopControlPolling(); // 停止要資料
+        }
+    });
+});
+
+// 2. 初始化列表 UI
+function initControlPanelUI() {
+    if (!controlListContainer) return;
+    controlListContainer.innerHTML = '';
+
+    for (let i = 0; i < NUM_LUX_DEVICES; i++) {
+        const row = document.createElement('div');
+        row.className = 'control_row';
+        row.innerHTML = `
+            <div class="col-id">${i}</div>
+            <div class="col-state"><span class="state_text disconnected" id="state_${i}">斷線</span></div>
+            <div class="col-time"><span class="time_text" id="time_${i}">--:--:--</span></div>
+            <div class="col-mode">
+                <select class="mode_select" onchange="updateLuxMode(${i}, this.value)">
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </div>
+            <div class="col-rst">
+                <input type="checkbox" class="rst_check" onchange="triggerReset(${i}, this)">
+            </div>
+        `;
+        controlListContainer.appendChild(row);
+    }
+}
+
+// 3. 呼叫 Server API
+
+// 時間格式化工具
+function formatDuration(ms) {
+    if (ms < 0) return "00:00";
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    // 為了節省空間，若小時為0則不顯示
+    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+// 輪詢狀態 (/get_stat)
+async function updateControlStatus() {
+    const now = Date.now();
+    for (let i = 0; i < NUM_LUX_DEVICES; i++) {
+        try {
+            // 對應 server.js: app.get("/get_stat", ...)
+            const res = await fetch(`/get_stat?id=${i}`);
+            if (!res.ok) continue;
+
+            const lastSeenStr = await res.text();
+            const lastSeenTime = parseInt(lastSeenStr); 
+
+            const stateEl = document.getElementById(`state_${i}`);
+            const timeEl = document.getElementById(`time_${i}`);
+
+            // 判斷連線 (例如 5秒內有更新算連線)
+            const diff = now - lastSeenTime;
+            const isConnected = (lastSeenTime > 0 && diff < 5000);
+
+            if (isConnected) {
+                stateEl.textContent = "連線";
+                stateEl.className = "state_text connected";
+                timeEl.textContent = formatDuration(diff);
+            } else {
+                stateEl.textContent = "斷線";
+                stateEl.className = "state_text disconnected";
+                timeEl.textContent = "--:--";
+            }
+        } catch (e) {
+            console.warn(e);
+        }
+    }
+}
+
+// 更新模式 (/update_lux_mode)
+window.updateLuxMode = function(id, modeVal) {
+    fetch(`/update_lux_mode?id=${id}&mode=${modeVal}`)
+        .then(res => res.text())
+        .then(txt => console.log("Mode update:", txt))
+        .catch(err => console.error(err));
+};
+
+// 更新重置 (/update_lux_reset)
+window.triggerReset = function(id, checkbox) {
+    const isChecked = checkbox.checked;
+    fetch(`/update_lux_reset?id=${id}&clear=${isChecked}`)
+        .then(res => res.text())
+        .then(txt => console.log("Reset update:", txt))
+        .catch(err => console.error(err));
+};
+
+// 4. 啟動器
+function startControlPolling() {
+    if (controlPollingInterval) return;
+    updateControlStatus();
+    controlPollingInterval = setInterval(updateControlStatus, 1000);
+}
+
+function stopControlPolling() {
+    if (controlPollingInterval) {
+        clearInterval(controlPollingInterval);
+        controlPollingInterval = null;
+    }
+}
+
+// 初始化 UI
+initControlPanelUI();
