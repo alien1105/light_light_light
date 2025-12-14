@@ -2223,7 +2223,7 @@ if (btnImport && fileInputImport) {
 
 // 控制面板邏輯
 
-const NUM_LUX_DEVICES = 6; // 燈具數量
+const NUM_LUX_DEVICES = 5; // 燈具數量
 const row2Container = document.querySelector('.row2');
 const controlListContainer = document.getElementById('control_list_container');
 let controlPollingInterval = null;
