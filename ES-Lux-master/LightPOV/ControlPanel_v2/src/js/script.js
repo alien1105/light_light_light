@@ -1352,7 +1352,6 @@ function updateAssetPositions() {
   asset_canvas1.getObjects().forEach(obj => {
     // 1. 檢查有沒有 logicBlock (靈魂)
     if (obj.logicBlock) {
-<<<<<<< HEAD
       
       // ▼▼▼【絕對不能漏掉這一行】▼▼▼
       const block = obj.logicBlock; 
@@ -1379,7 +1378,6 @@ function updateAssetPositions() {
                   scaleX: 1 / obj.scaleX,
                       scaleY: 1 
               });
-=======
       
       // ▼▼▼【絕對不能漏掉這一行】▼▼▼
       const block = obj.logicBlock; 
@@ -2250,16 +2248,11 @@ if (btnImport && fileInputImport) {
         };
         reader.readAsText(file);
     });
-<<<<<<< HEAD
 }
 
-// src/js/script.js (放在檔案最後面)
-
-// ==========================================
 // 控制面板邏輯
-// ==========================================
 
-const NUM_LUX_DEVICES = 5; // 燈具數量
+const NUM_LUX_DEVICES = 6; // 燈具數量
 const row2Container = document.querySelector('.row2');
 const controlListContainer = document.getElementById('control_list_container');
 let controlPollingInterval = null;
