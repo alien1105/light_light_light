@@ -4,7 +4,7 @@
 // #define DEBUGGER
 // #define DEBUGGER_TASK_REPORT
 
-#define LUX_ID 2
+#define LUX_ID_DEFAULT 2
 
 /* Type Definition */
 #define time_t unsigned long
@@ -13,18 +13,19 @@
 
 /* Pin Configuration */
 #define PIN_LED 40       // Which pin on the Arduino is connected to the NeoPixels?
-#define NUMPIXELS 32 // How many NeoPixels are attached to the Arduino?
+#define NUMPIXELS_DEFAULT 32 // How many NeoPixels are attached to the Arduino?
 
 /* Network configuration */ 
-#define WIFI_SSID1 "superfan"
-#define WIFI_PASS1 "20031114"
-#define WIFI_SSID2 "Esp32"
-#define WIFI_PASS2 "hsnu1524"
-#define WIFI_SSID3 "NCKUES[AUTO]"
-#define WIFI_PASS3 "nckues_auto"
+/* Network configuration */ 
+#define WIFI_SSID1_DEFAULT "superfan"
+#define WIFI_PASS1_DEFAULT "20031114"
+#define WIFI_SSID2_DEFAULT "Esp32"
+#define WIFI_PASS2_DEFAULT "hsnu1524"
+#define WIFI_SSID3_DEFAULT "NCKUES[AUTO]"
+#define WIFI_PASS3_DEFAULT "nckues_auto"
 
-#define WIFI_REQUEST_URL ":10240/get_effect"
-#define WIFI_TIME_CHECK_URL ":10240/esp_time"
+#define WIFI_REQUEST_URL_DEFAULT ":10240/get_effect"
+#define WIFI_TIME_CHECK_URL_DEFAULT ":10240/esp_time"
 
 #define WIFI_CONNECT_RETRY 20
 

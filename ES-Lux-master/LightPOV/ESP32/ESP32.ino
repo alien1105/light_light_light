@@ -2,6 +2,7 @@
 #include "config.h"
 #include "modes.h"
 #include "communication.h"
+#include "ConfigManager.h"
 
 TaskHandle_t LED_UPDATE;
 TaskHandle_t WIFI_HANDLE;
@@ -12,7 +13,8 @@ Communication comm = Communication();
 void setup(){
     Serial.begin(115200);
     Serial.println("Start up");
-    effect.lightOnOneLED(CHSV(0, 200, 50), LUX_ID + 1);
+    configManager.begin();
+    effect.lightOnOneLED(CHSV(0, 200, 50), configManager.data.lux_id + 1);
     delay(3000);
     comm.init();
 
@@ -52,6 +54,9 @@ void WIFI_HANDLE_CODE(void *pvParameters)
     while (1)
     {
         uint8_t current_id = effect.checkBufferAvailable();
+        
+        comm.handleClient(); // Handle AP mode usage
+
         if (current_id >= 0){
             Mode m;
             if ( comm.receive(&m, current_id) ){
@@ -66,7 +71,7 @@ void WIFI_HANDLE_CODE(void *pvParameters)
         if (millis() - last_check_time > START_TIME_CHECK_INTERVAL){
             Mode m;
             effect.buffer.peek(&m);
-            effect.setMusicTime( comm.check_start_time(LUX_ID, m.mode, &effect.force_mode) );
+            effect.setMusicTime( comm.check_start_time(configManager.data.lux_id, m.mode, &effect.force_mode) );
             last_check_time = millis();
         }
         vTaskDelay(pdMS_TO_TICKS(10));
