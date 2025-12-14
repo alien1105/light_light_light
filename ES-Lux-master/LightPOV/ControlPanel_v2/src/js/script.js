@@ -580,6 +580,51 @@ function startServerTimeSync() {
     }, 50); 
 }
 
+const importBtn = document.getElementById('btn_import_json');
+const importInput = document.getElementById('import_file_input');
+
+if (importBtn && importInput) {
+    // 1. 點擊按鈕時，觸發隱藏的 input 點擊事件
+    importBtn.addEventListener('click', () => {
+        importInput.value = ''; // 清空 value，確保選同一個檔案也能觸發 change
+        importInput.click();
+    });
+
+    // 2. 當使用者選好檔案後
+    importInput.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // 注意：瀏覽器基於安全性，通常只拿得到檔名 (file.name)，拿不到完整路徑
+        // 如果您是在本地環境執行 Server 且檔案都在專案資料夾內，傳送檔名即可
+        const fileName = file.name; 
+
+        console.log("準備切換設定檔為:", fileName);
+
+        // 3. 發送請求給 Server 切換檔案
+        fetch('/update_file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                file: fileName
+            })
+        })
+        .then(async (res) => {
+            if (res.ok) {
+                console.log("Server 成功切換設定檔！");
+                alert(`成功載入設定檔：${fileName}`);
+                // 這裡建議重新整理頁面，讓前端重新抓取新的 EffectMap
+                // location.reload(); 
+            } else {
+                const errMsg = await res.text();
+                console.error("切換失敗:", errMsg);
+                alert("匯入失敗，請確認 Server 找得到該檔案。\n錯誤訊息: " + errMsg);
+            }
+        })
+    });
+}
+
+
 // 頁面載入後自動啟動同步
 document.addEventListener('DOMContentLoaded', () => {
     startServerTimeSync();
