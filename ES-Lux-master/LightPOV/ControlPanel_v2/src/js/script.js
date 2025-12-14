@@ -559,18 +559,31 @@ function buildEffectConfigFromUI() {
 // const obj = buildEffectConfigFromUI();
 // const jsonStr = JSON.stringify(obj, null, 2);
 
-function sendToSettime(jsonPath) {
-  const currentPlaybackTime = 0; 
+function startServerTimeSync() {
+    if (window.timeSyncInterval) return;
 
-  fetch('/settime', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      path: jsonPath,
-      current_time: currentPlaybackTime
-    })
-  })
+    window.timeSyncInterval = setInterval(() => {
+        const audio = document.getElementById('audio');
+        
+        // 如果 audio 元素存在
+        if (audio) {
+            const currentTimeMs = Math.floor(audio.currentTime * 1000);
+
+            fetch('/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    time: currentTimeMs 
+                })
+            })
+        }
+    }, 50); 
 }
+
+// 頁面載入後自動啟動同步
+document.addEventListener('DOMContentLoaded', () => {
+    startServerTimeSync();
+});
 
 // Audio / waveform state
 let audioCtx = null;
