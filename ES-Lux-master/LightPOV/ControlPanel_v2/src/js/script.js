@@ -1313,6 +1313,7 @@ function syncParamsToActiveObject(e) {
       console.log(`✅ 成功寫入 ID:${block.id}。資料庫目前狀態:`, globalEffectData);
   }
 
+
   asset_canvas1.requestRenderAll();
 }
 
@@ -1815,6 +1816,33 @@ if (btnDeleteCustom) {
 //  JSON 匯出功能 (Export to JSON)
 
 function generateProjectJson() {
+    if (typeof asset_canvas1 !== 'undefined' && asset_canvas1) {
+        const objects = asset_canvas1.getObjects();
+        
+        objects.forEach(obj => {
+            // 確保物件有靈魂 (logicBlock)
+            if (obj.logicBlock && obj.logicBlock.id) {
+                const id = obj.logicBlock.id;
+                
+                // 1. 計算目前的正確時間 (防止負值)
+                let currentStartTime = timelineOffset + obj.left * secondsPerPixel;
+                if (currentStartTime < 0) currentStartTime = 0;
+
+                // 2. 計算目前的正確長度
+                // 寬度 * 縮放比例 * 每像素秒數
+                let currentDuration = (obj.width * obj.scaleX) * secondsPerPixel;
+                // 3. 更新全域資料庫
+                if (window.globalEffectData[id]) {
+                    window.globalEffectData[id].startTime = currentStartTime;
+                    window.globalEffectData[id].duration = currentDuration;
+                } else {
+                    // 防呆：如果資料庫意外遺失該 ID，嘗試補救 (選用)
+                    console.warn(`ID ${id} 存在於畫布但不在資料庫中`);
+                }
+            }
+        });
+        console.log("✅ 已完成畫面與資料庫的幾何同步");
+    }
     // 取出所有方塊數據並轉為陣列
     const allBlocks = Object.values(window.globalEffectData || {});
 
@@ -1838,22 +1866,30 @@ function generateProjectJson() {
         const packHsv = (prefix) => {
             const funcStr = block[`${prefix}_func`] || "none";
             const funcCode = FUNC_CODE[funcStr] || 0;
-            
+            // 判斷最大值
+            const isHue = prefix.includes('H'); 
+            const maxVal = isHue ? 359 : 100;
             // 讀取數值 (如果沒有該欄位則預設 0)
-            const range = block[`${prefix}_range`] || 0;
-            const lower = block[`${prefix}_lower`] || 0;
+            const originalRange = block[`${prefix}_range`] || 0;
+            const oringinalLower = block[`${prefix}_lower`] || 0;
+            const range = normalizeTo255(originalRange, 0, maxVal);
+            const lower = normalizeTo255(oringinalLower, 0, maxVal);
             let p1 = 0, p2 = 0;
 
             // 根據 Function 決定 p1, p2 來源
             // 邏輯參照原本的 packHsvBlock
             if (funcCode === 1) { // Const
-                p1 = block[`${prefix}_value`] || 0;
+                const originalValue  = block[`${prefix}_value`] || 0;
+                p1 = normalizeTo255(originalValue, 0, maxVal);
             } else if (funcCode === 2 || funcCode === 3) { // Ramp, Tri
-                p1 = block[`${prefix}_upper`] || 0;
+                const originalUpper = block[`${prefix}_upper`] || 0;
+                p1 = normalizeTo255(originalUpper, 0, maxVal);
             } else if (funcCode === 4) { // Pulse
-                p1 = block[`${prefix}_top`] || 0;
+                const originalTop = block[`${prefix}_top`] || 0;
+                p1 = normalizeTo255(originalTop, 0, maxVal);
             } else if (funcCode === 5) { // Step
-                p1 = block[`${prefix}_height`] || 0;
+                const originalHeight = block[`${prefix}_height`] || 0;
+                p1 = normalizeTo255(originalHeight, 0, maxVal);
                 p2 = block[`${prefix}_step`] || 0;
             }
 
@@ -1875,28 +1911,28 @@ function generateProjectJson() {
         // 根據模式填入 p1~p4
         switch (modeStr) {
             case "MODES_SQUARE":
-                p3 = normalizeTo255(boxsize, 0, 300);
+                p3 = boxsize;
                 break;
             case "MODES_SICKLE":
-                p1 = normalizeTo255(positionFix, 0, 255);
-                p3 = normalizeTo255(curvature, 0, 100);
-                p4 = normalizeTo255(length, 0, 300);
+                p1 = positionFix;
+                p3 = curvature;
+                p4 = length;
                 break;
             case "MODES_FAN":
-                p1 = normalizeTo255(curvature, 0, 100);
-                p3 = normalizeTo255(bladeCount, 0, 12);
-                p4 = normalizeTo255(length, 0, 300);
+                p1 = curvature;
+                p3 = bladeCount;
+                p4 = length;
                 break;
             case "MODES_BOXES":
-                p3 = normalizeTo255(boxsize, 0, 300);
-                p4 = normalizeTo255(space, 0, 100);
+                p3 = boxsize;
+                p4 = space;
                 break;
             case "MODES_CMAP_DNA":
                 p1 = reverse ? 255 : 0;
-                p4 = normalizeTo255(space, 0, 100);
+                p4 = space;
                 break;
             case "MODES_CMAP_FIRE":
-                p4 = normalizeTo255(space, 0, 100);
+                p4 = space;
                 break;
         }
 
@@ -1988,8 +2024,15 @@ function unpackHsvToParams(prefix, hsvData) {
     const funcName = FUNC_CODE_INV[hsvData.func] || "none";
     
     params[`${prefix}_func`] = funcName;
-    params[`${prefix}_range`] = hsvData.range || 0;
-    params[`${prefix}_lower`] = hsvData.lower || 0;
+
+    // 定義正確的最大值：
+    const isHue = prefix.endsWith('H'); 
+    const maxVal = isHue ? 359 : 100;
+    // 輔助函式：從 255 反推
+    const f = (v255, max) => from255(v255, 0, max);
+
+    params[`${prefix}_range`] = f(hsvData.range, maxVal) || 0;
+    params[`${prefix}_lower`] = f(hsvData.lower, maxVal) || 0;
     
     // 根據 Function 還原特定欄位
     const p1 = hsvData.p1 || 0;
@@ -1997,17 +2040,17 @@ function unpackHsvToParams(prefix, hsvData) {
 
     switch (hsvData.func) {
         case 1: // Const (p1=value)
-            params[`${prefix}_value`] = p1;
+            params[`${prefix}_value`] = f(p1, maxVal);
             break;
         case 2: // Ramp (p1=upper)
         case 3: // Tri
-            params[`${prefix}_upper`] = p1;
+            params[`${prefix}_upper`] = f(p1, maxVal);
             break;
         case 4: // Pulse (p1=top)
-            params[`${prefix}_top`] = p1;
+            params[`${prefix}_top`] = f(p1, maxVal);
             break;
         case 5: // Step (p1=height, p2=step)
-            params[`${prefix}_height`] = p1;
+            params[`${prefix}_height`] = f(p1, maxVal);
             params[`${prefix}_step`] = p2;
             break;
     }
@@ -2017,34 +2060,30 @@ function unpackHsvToParams(prefix, hsvData) {
 // 額外參數解包器 (將 p1~p4 轉回 bladeCount, length...)
 function unpackExtrasToParams(modeStr, p1, p2, p3, p4) {
     const params = {};
-    
-    // 輔助函式：從 255 反推回原始區間
-    const f = (v255, min, max) => from255(v255, min, max);
-
     switch (modeStr) {
         case "MODES_SQUARE":
-            params.boxsize = f(p3, 0, 300);
+            params.boxsize = p3;
             break;
         case "MODES_SICKLE":
-            params.position_fix = f(p1, 0, 255);
-            params.curvature    = f(p3, 0, 100);
-            params.length       = f(p4, 0, 300);
+            params.position_fix = p1;
+            params.curvature    = p3;
+            params.length       = p4;
             break;
         case "MODES_FAN":
-            params.curvature  = f(p1, 0, 100);
-            params.bladeCount = f(p3, 0, 12);
-            params.length     = f(p4, 0, 300);
+            params.curvature  = p1;
+            params.bladeCount = p3;
+            params.length     = p4;
             break;
         case "MODES_BOXES":
-            params.boxsize = f(p3, 0, 300);
-            params.space   = f(p4, 0, 100);
+            params.boxsize = p3;
+            params.space   = p4;
             break;
         case "MODES_CMAP_DNA":
             params.reverse = (p1 >= 128); // Boolean
-            params.space   = f(p4, 0, 100);
+            params.space   = p4;
             break;
         case "MODES_CMAP_FIRE":
-            params.space = f(p4, 0, 100);
+            params.space = p4;
             break;
     }
     return params;
@@ -2104,6 +2143,7 @@ function importProjectFromJson(jsonArray) {
 
         // 在畫布上建立實體
         const newBlock = new EffectBlock(currentId, assetName);
+        newBlock.params = restoredParams;
         
         // 設定時間
         newBlock.startTime = startTimeSec;
@@ -2153,12 +2193,9 @@ if (btnImport && fileInputImport) {
                     
                     // 偵測是否為 2D 陣列 (檢查第一個元素是不是也是陣列)
                     if (rawData.length > 0 && Array.isArray(rawData[0])) {
-                        console.log("⚠️ 偵測到 2D 陣列！正在自動攤平 (Flatten)...");
                         
                         // 使用 .flat() 將 [[A,B], [C,D]] 變成 [A,B,C,D]
                         finalData = rawData.flat(); 
-                        
-                        alert(`偵測到多層資料結構，已自動合併 ${rawData.length} 組資料，共 ${finalData.length} 個方塊。`);
                     } 
                     // 否則就是標準的 1D 陣列
                     else {
