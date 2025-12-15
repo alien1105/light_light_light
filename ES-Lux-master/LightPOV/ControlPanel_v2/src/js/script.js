@@ -100,14 +100,14 @@ function resetAllParams() {
 // 切換參數介面
 function switchEffectUI(name) {
   console.log(`[UI切換] 原始名稱: "${name}"`);
-    // 1. 更新當前的模式字串 (供後續儲存使用)
+    // 更新當前的模式字串 (供後續儲存使用)
     currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
 
-    // 2. 顯示參數面板，隱藏空狀態
+    // 顯示參數面板，隱藏空狀態
     if (paramEmpty) paramEmpty.style.display = 'none';
     if (paramMain) paramMain.classList.remove('hidden');
 
-    // 3. 根據 EFFECT_CONFIG 決定要顯示哪些額外參數 (Extra Groups)
+    // 根據 EFFECT_CONFIG 決定要顯示哪些額外參數 (Extra Groups)
     const cfg = EFFECT_CONFIG[name] || { extras: [] };
 
       extraGroups.forEach(g => {
@@ -115,7 +115,7 @@ function switchEffectUI(name) {
           g.style.display = cfg.extras.includes(key) ? "block" : "none";
       });
 
-    // 4. 特殊處理：如果是 "清除"，則隱藏面板
+    // 特殊處理：如果是 "清除"，則隱藏面板
     if (name === "清除") {
         paramMain.classList.add('hidden');
     }
@@ -125,7 +125,7 @@ function switchEffectUI(name) {
 function restorePanelParams(params) {
     if (!params) return;
 
-    // 1. 先把所有要處理的 DOM 找出來，並分類
+    // 先把所有要處理的 DOM 找出來，並分類
     let selectEls = [];
     let otherEls = [];
 
@@ -148,13 +148,13 @@ function restorePanelParams(params) {
         });
     });
 
-    // 2. 第一階段：先還原下拉選單 (確保面板被打開)
+    // 先還原下拉選單 (確保面板被打開)
     selectEls.forEach(({ el, val }) => {
         el.value = val;
         el.dispatchEvent(new Event('change', { bubbles: true }));
     });
 
-    // 3. 第二階段：填入數值 (這時候面板已經打開且不會被重置)
+    // 填入數值
     otherEls.forEach(({ el, val }) => {
         if (el.type === 'checkbox' || el.type === 'radio') {
             el.checked = val;
@@ -177,20 +177,20 @@ function capturePanelParams() {
         const key = el.id || el.dataset.param;
         if (!key) return;
 
-        // 1. 過濾隱藏的 HSV 參數 (原本的邏輯)
+        // 過濾隱藏的 HSV 參數 (原本的邏輯)
         const parentSet = el.closest('.hsv_func_params');
         if (parentSet && !parentSet.classList.contains('active')) {
             return; 
         }
 
-        // 2. [關鍵修正] 過濾隱藏的額外參數群組
+        // 過濾隱藏的額外參數群組
         // 如果這個 input 屬於某個 extra_group，且該 group 目前被隱藏 (display: none)，就不要存它
         const extraGroup = el.closest('.extra_group');
         if (extraGroup && window.getComputedStyle(extraGroup).display === 'none') {
             return; 
         }
 
-        // 3. 根據類型取值
+        // 根據類型取值
         if (el.type === 'checkbox' || el.type === 'radio') {
             params[key] = el.checked;
         } 
@@ -219,7 +219,7 @@ assetItems.forEach(item => {
         asset_canvas1.requestRenderAll();
         currentEditingId = null; // 清空編輯ID，告訴 syncParams 不要存檔
     }
-    // 3. UI 切換與重置 (給使用者一個乾淨的開始調整)
+    // UI 切換與重置
     currentModeStr = MODE_MAP[name] || "MODES_PLAIN";
     document.querySelectorAll('.Asset_item').forEach(i => i.classList.remove('active'));
     item.classList.add('active');
@@ -569,12 +569,8 @@ function startServerTimeSync() {
         if (audio) {
             const currentTimeMs = Math.floor(audio.currentTime * 1000);
 
-            fetch('/start', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    time: currentTimeMs 
-                })
+            fetch(`/start?time=${currentTimeMs}`, {
+                method: 'GET'
             })
         }
     }, 50); 
@@ -584,24 +580,23 @@ const importBtn = document.getElementById('btn_import_json');
 const importInput = document.getElementById('import_file_input');
 
 if (importBtn && importInput) {
-    // 1. 點擊按鈕時，觸發隱藏的 input 點擊事件
-    importBtn.addEventListener('click', () => {
+    // 點擊按鈕時，觸發隱藏的 input 點擊事件
+    /*importBtn.addEventListener('click', () => {
         importInput.value = ''; // 清空 value，確保選同一個檔案也能觸發 change
         importInput.click();
-    });
+    });*/
 
-    // 2. 當使用者選好檔案後
+    // 當使用者選好檔案後
     importInput.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        // 注意：瀏覽器基於安全性，通常只拿得到檔名 (file.name)，拿不到完整路徑
         // 如果您是在本地環境執行 Server 且檔案都在專案資料夾內，傳送檔名即可
         const fileName = file.name; 
 
         console.log("準備切換設定檔為:", fileName);
 
-        // 3. 發送請求給 Server 切換檔案
+        // 發送請求給 Server 切換檔案
         fetch('/update_file', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -613,8 +608,6 @@ if (importBtn && importInput) {
             if (res.ok) {
                 console.log("Server 成功切換設定檔！");
                 alert(`成功載入設定檔：${fileName}`);
-                // 這裡建議重新整理頁面，讓前端重新抓取新的 EffectMap
-                // location.reload(); 
             } else {
                 const errMsg = await res.text();
                 console.error("切換失敗:", errMsg);
@@ -685,14 +678,14 @@ function initTimelineFabric() {
   // timeline drag (panning) when clicking empty space
   let isPanning = false;
   let lastPanX = 0;
-  // 🌟 新增變數：用於判斷是否發生拖曳
+  // 新增變數：用於判斷是否發生拖曳
   let isDraggingTimeline = false;
   timescale_canvas.on('mouse:down', (e) => {
     // if clicked an object, do nothing (object drag handlers will run)
     if (e.target) return;
     isPanning = true;
     lastPanX = e.pointer.x;
-    // 🌟 記錄初始位置，並重設拖曳旗標
+    // 記錄初始位置，並重設拖曳旗標
     initialClickX = e.pointer.x;
     isDraggingTimeline = false;
   });
@@ -709,7 +702,7 @@ function initTimelineFabric() {
 
   timescale_canvas.on('mouse:up', (e) => {
     if (!isPanning) return;
-    // 🌟 關鍵修正：檢查是否為點擊 (沒有發生拖曳)
+    // 檢查是否為點擊 (沒有發生拖曳)
     // 且確保 e.target 為空 (沒有點擊到 waveformObj)
     if (!isDraggingTimeline && !e.target) {
         const p = e.pointer;
@@ -803,7 +796,7 @@ function drawTimeline() {
   // add waveform object if exists
   if (waveformObj && audioBuffer) {
     updateWaveformScaleAndPos(); // ensure scale/left are correct for current zoom/offset
-    canvas.add(waveformObj);
+    //canvas.add(waveformObj);
 
       timescale_canvas.add(waveformObj);
       
@@ -821,66 +814,99 @@ function drawTimeline() {
 async function createWaveformImageAndAddToTimeline() {
   if (!audioBuffer || !timescale_canvas) return;
 
-  // create a large base image width (e.g., px per second base)
-  const basePxPerSec = 200; // tune: larger = more detailed waveform image
-  const baseWidth = Math.max(2000, Math.floor(audioBuffer.duration * basePxPerSec));
+  // 解析度設定
+  const basePxPerSec = 1000; 
+  
+  // 設定單張切片的最大寬度
+  const CHUNK_WIDTH = 4000; 
   const height = 95;
-
-  const cv = document.createElement('canvas');
-  cv.width = baseWidth;
-  cv.height = height;
-  const c = cv.getContext('2d');
-
-  // background
-  c.fillStyle = "#0d1117";
-  c.fillRect(0, 0, baseWidth, height);
-
-  // draw peaks
   const mid = height / 2;
-  c.strokeStyle = "#4fb3d6";
-  c.lineWidth = 1;
-  c.beginPath();
 
-  for (let x = 0; x < baseWidth; x++) {
-    const idx = Math.floor(x * (peaks.length / baseWidth));
-    const p = peaks[idx] || 0;
-    const y = p * (height / 2);
-    c.moveTo(x + 0.5, mid - y);
-    c.lineTo(x + 0.5, mid + y);
+  // 計算總寬度與需要的切片數量
+  const totalWidth = Math.floor(audioBuffer.duration * basePxPerSec);
+  const totalChunks = Math.ceil(totalWidth / CHUNK_WIDTH);
+
+  const waveformImages = []; // 暫存所有切片物件
+
+  // 迴圈：一段一段畫
+  for (let i = 0; i < totalChunks; i++) {
+    // 計算這一塊的起始與結束 X
+    const startX = i * CHUNK_WIDTH;
+    const currentChunkWidth = Math.min(CHUNK_WIDTH, totalWidth - startX);
+
+    // 建立小畫布
+    const cv = document.createElement('canvas');
+    cv.width = currentChunkWidth;
+    cv.height = height;
+    const c = cv.getContext('2d');
+
+    // 填背景
+    c.fillStyle = "#0d1117";
+    c.fillRect(0, 0, currentChunkWidth, height);
+
+    // 畫波形線條
+    c.strokeStyle = "#4fb3d6";
+    c.lineWidth = 1;
+    c.beginPath();
+
+    // 計算這一塊對應到的 peaks 索引範圍
+    const peaksPerPixel = peaks.length / totalWidth;
+    
+    for (let x = 0; x < currentChunkWidth; x++) {
+      // 全域 x 座標 = startX + 局部 x
+      const globalX = startX + x;
+      const idx = Math.floor(globalX * peaksPerPixel);
+      
+      const p = peaks[idx] || 0;
+      const y = p * (height / 2);
+      c.moveTo(x + 0.5, mid - y);
+      c.lineTo(x + 0.5, mid + y);
+    }
+    c.stroke();
+
+    // 轉成 Fabric Image
+    const imgURL = cv.toDataURL();
+    
+    const promise = new Promise(resolve => {
+        fabric.Image.fromURL(imgURL, (img) => {
+            // 設定每一張小圖的位置
+            img.set({
+                left: startX, // 這一張圖在群組內的相對位置
+                top: 0,
+                originX: 'left',
+                originY: 'top' 
+            });
+            resolve(img);
+        });
+    });
+    waveformImages.push(await promise);
   }
-  c.stroke();
 
-  // convert to dataURL
-  waveformImgURL = cv.toDataURL();
-
-  // remove old waveformObj
+  // 移除舊的物件
   if (waveformObj) {
     timescale_canvas.remove(waveformObj);
     waveformObj = null;
   }
 
-  return new Promise((resolve) => {
-    fabric.Image.fromURL(waveformImgURL, (img) => {
-      waveformObj = img;
-      waveformObj.set({
-        left: 0,
-        top: 110,
-        originY: 'center',
-        selectable: true,
-        hasControls: false,
-        hasBorders: false,
-        hoverCursor: 'grab'
-      });
+  // 將所有切片組合成一個 Group
+  waveformObj = new fabric.Group(waveformImages, {
+    left: 0,
+    top: 110,
+    originY: 'center',
+    selectable: true,
+    hasControls: false,
+    hasBorders: false,
+    hoverCursor: 'grab',
+    objectCaching: false,
+    subTargetCheck: false
+  });
 
-
-      // make sure user can only drag horizontally
-    waveformObj.on('moving', () => {
+  // 綁定拖曳事件
+  waveformObj.on('moving', () => {
     waveformObj.top = 110;
 
-    // 計算 clipStartSec（尚未 clamp）
     let newClipStart = timelineOffset + waveformObj.left * secondsPerPixel;
 
-    // 若小於 0 → 強制回到 0
     if (newClipStart < 0) {
         newClipStart = 0;
         waveformObj.left = (0 - timelineOffset) / secondsPerPixel;
@@ -890,58 +916,63 @@ async function createWaveformImageAndAddToTimeline() {
 
     ensureAudioSyncToGlobal(true);
     updateTimeUI();
-    // 同步三條線段的位置 (只需同步 left)
-    waveformLines.forEach((line,index) => {
-        if (index === 1) { // 右側框線 (index=1)
-            // 右框線位置 = 波形圖起始位置 + 拉伸後的寬度
-            line.left = waveformObj.left + clipWidthPx;
+    
+    // 同步框線位置
+    const currentGroupWidth = waveformObj.width * waveformObj.scaleX;
+
+    waveformLines.forEach((line, index) => {
+        if (index === 1) { // 右框線
+            line.left = waveformObj.left + currentGroupWidth;
         } else {
-            // 左側 (index=0) 和底部 (index=2) 框線
             line.left = waveformObj.left;
         }
         line.setCoords();
     });
     timescale_canvas.requestRenderAll();
-});
+  });
 
+  // 初始化縮放與位置
+  updateWaveformScaleAndPos();
+  
+  // 重建框線
+  createWaveformLines(waveformObj);
 
-      // initial scale & position
-      updateWaveformScaleAndPos();
-      // 在此處創建三條線段 (左、右、底)
-    waveformLines = []; // 清空舊的線段
+  timescale_canvas.add(waveformObj);
+  timescale_canvas.requestRenderAll();
+}
+
+// 框線建立
+function createWaveformLines(targetObj) {
+    // 先移除舊線
+    if (window.waveformLines && window.waveformLines.length) {
+        window.waveformLines.forEach(l => timescale_canvas.remove(l));
+    }
+    window.waveformLines = [];
+
     const strokeOpts = {
       stroke: '#ffffff',
       strokeWidth: 2,
       selectable: false,
       evented: false
     };
-    const topY = 110 - img.height / 2; // top 屬性是 110
-    const bottomY = 110 + img.height / 2;
-    const height = img.height;
-    const width = img.width;
+    
+    // Group 的高度
+    const h = targetObj.height;
+    const w = targetObj.width;
+    const topY = 110 - h / 2;
+    const bottomY = 110 + h / 2;
 
-    // 左側框線: 
     const leftLine = new fabric.Line([0, topY, 0, bottomY], strokeOpts);
     leftLine.set({ originY: 'center', top: 110 });
 
-    // 右側框線:
-    const rightLine = new fabric.Line([width, topY, width, bottomY], strokeOpts);
+    const rightLine = new fabric.Line([w, topY, w, bottomY], strokeOpts);
     rightLine.set({ originY: 'center', top: 110 });
 
-    // 底部框線: (使用相對座標 [0, 0] 到 [width, 0], 然後用 top 定位在 bottomY)
-    const bottomLine = new fabric.Line([0, 0, width, 0], strokeOpts);
+    const bottomLine = new fabric.Line([0, 0, w, 0], strokeOpts);
     bottomLine.set({ originY: 'center', top: bottomY });
 
-
-    waveformLines.push(leftLine, rightLine, bottomLine);
-    
-    // 依序將線段加入畫布
-    waveformLines.forEach(line => timescale_canvas.add(line));
-      timescale_canvas.add(waveformObj);
-      timescale_canvas.requestRenderAll();
-      resolve();
-    });
-  });
+    window.waveformLines.push(leftLine, rightLine, bottomLine);
+    window.waveformLines.forEach(line => timescale_canvas.add(line));
 }
 
 // Update waveform scale based on secondsPerPixel and clipStartSec -> position left
@@ -1996,7 +2027,7 @@ function generateProjectJson() {
         };
     });
 
-    return exportData;
+    return [exportData];
 }
 
 // 綁定按鈕事件
