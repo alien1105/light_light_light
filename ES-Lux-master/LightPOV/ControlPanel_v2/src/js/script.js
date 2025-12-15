@@ -2409,14 +2409,24 @@ function generateProjectJson() {
             p1, p2, p3, p4
         };
     };
+    // 先產生完整的 6 軌資料列表
+    const fullList = [
+        layer1Blocks.map(exportData),
+        layer2Blocks.map(exportData),
+        layer3Blocks.map(exportData),
+        layer4Blocks.map(exportData),
+        layer5Blocks.map(exportData),
+        layer6Blocks.map(exportData),
+    ];
 
-    return [layer1Blocks.map(exportData),
-            layer2Blocks.map(exportData),
-            layer3Blocks.map(exportData),
-            layer4Blocks.map(exportData),
-            layer5Blocks.map(exportData),
-            layer6Blocks.map(exportData)
-           ];
+    // 去除空陣列
+    // 從陣列最後面開始檢查，如果是空的就移除 (pop)，直到遇到有資料的軌道為止
+    // 這樣做可以保留中間的空軌 (例如: [[軌1], [], [軌3]]) 以維持索引正確
+    while (fullList.length > 0 && fullList[fullList.length - 1].length === 0) {
+        fullList.pop();
+    }
+
+    return fullList;
 }
 
 // 綁定按鈕事件
