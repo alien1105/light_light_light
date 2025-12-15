@@ -1,147 +1,43 @@
 [
   [
     {
-      "mode": "MODES_CMAP_FIRE",
-      "start_time": 3260,
-      "duration": 2544,
-      "XH": {
-        "func": 2,
-        "range": 140,
-        "lower": 78,
-        "p1": 162,
-        "p2": 0
-      },
-      "XS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "XV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YH": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "p1": 0,
-      "p2": 0,
-      "p3": 0,
-      "p4": 50
-    },
-    {
-      "mode": "MODES_BOXES",
-      "start_time": 11562,
-      "duration": 2026,
-      "XH": {
-        "func": 3,
-        "range": 139,
-        "lower": 69,
-        "p1": 36,
-        "p2": 0
-      },
-      "XS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "XV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YH": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "p1": 0,
-      "p2": 0,
-      "p3": 137,
-      "p4": 66
-    }
-  ],
-  [
-    {
-      "mode": "MODES_CMAP_FIRE",
-      "start_time": 5060,
+      "mode": "MODES_PLAIN",
+      "start_time": 1765,
       "duration": 1000,
       "XH": {
         "func": 1,
         "range": 0,
         "lower": 0,
-        "p1": 98,
+        "p1": 128,
         "p2": 0
       },
       "XS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
+        "func": 2,
+        "range": 92,
+        "lower": 33,
+        "p1": 102,
         "p2": 0
       },
       "XV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
+        "func": 3,
+        "range": 77,
+        "lower": 84,
+        "p1": 105,
         "p2": 0
       },
       "YH": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
+        "func": 4,
+        "range": 28,
+        "lower": 92,
+        "p1": 183,
         "p2": 0
       },
       "YS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
+        "func": 5,
+        "range": 82,
+        "lower": 77,
+        "p1": 130,
+        "p2": 16
       },
       "YV": {
         "func": 0,
@@ -153,24 +49,26 @@
       "p1": 0,
       "p2": 0,
       "p3": 0,
-      "p4": 115
-    },
+      "p4": 0
+    }
+  ],
+  [
     {
       "mode": "MODES_FAN",
-      "start_time": 8501,
+      "start_time": 1740,
       "duration": 1000,
       "XH": {
-        "func": 4,
-        "range": 112,
-        "lower": 75,
-        "p1": 207,
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 87,
         "p2": 0
       },
       "XS": {
-        "func": 2,
-        "range": 77,
-        "lower": 69,
-        "p1": 171,
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
         "p2": 0
       },
       "XV": {
@@ -203,8 +101,9 @@
       },
       "p1": 0,
       "p2": 0,
-      "p3": 6,
-      "p4": 34
+      "p3": 2,
+      "p4": 23
     }
-  ]
+  ],
+  []
 ]
