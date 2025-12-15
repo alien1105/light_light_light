@@ -28,6 +28,7 @@ const volumeValue = document.getElementById('volumeValue');
 
 const timelineCanvasEl = document.getElementById('timelineCanvas');
 const assetCanvas1El = document.getElementById('assetCanvas1');
+const assetCanvas2El = document.getElementById('assetCanvas1');
 // asset library
 document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
     tab.addEventListener('click', () => {
@@ -840,6 +841,56 @@ function initAsset1Fabric() {
   asset_canvas.setWidth(assetCanvasEl.clientWidth);
   asset_canvas.setHeight(assetCanvasEl.clientHeight);
   asset_canvas.requestRenderAll();
+}
+
+// 初始化 Asset1 Canvas 的 Fabric 畫布
+function initAsset2Fabric() {
+  if (!assetCanvas2El) return;
+  
+  assetCanvas2El.width = assetCanvas2El.clientWidth;
+  assetCanvas2El.height = assetCanvas2El.clientHeight;
+
+  asset_canvas2 = new fabric.Canvas("assetCanvas2", {
+    selection: true,
+    renderOnAddRemove: true
+  });
+  
+  asset_canvas2.setWidth(assetCanvas2El.clientWidth);
+  asset_canvas2.setHeight(assetCanvas2El.clientHeight);
+
+  // 處理拖曳放下 (Drop)
+  const canvasContainer = asset_canvas2.wrapperEl;
+  canvasContainer.addEventListener('dragover', (e) => {
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!asset_canvas2) return;
+    const pointer = asset_canvas2.getPointer(e);
+    const assetName = e.dataTransfer.getData('text/plain');
+    // 傳入 asset_canvas2 作為目標
+    createAssetOnCanvas(assetName, pointer.x, pointer.y, asset_canvas2);
+  });
+
+  // 事件監聽：選取時載入參數
+  asset_canvas2.on('selection:created', (e) => {
+      // 選取畫布2時，取消畫布1的選取
+      if(asset_canvas1) {
+          asset_canvas1.discardActiveObject();
+          asset_canvas1.requestRenderAll();
+      }
+      loadAssetParams(e); // 呼叫原本的載入函式 (需修改 loadAssetParams 支援通用性，見下文)
+  });
+  asset_canvas2.on('selection:updated', loadAssetParams);
+  
+  asset_canvas2.on('selection:cleared', () => {
+     resetAllStrokes(asset_canvas2);
+     currentEditingId = null;
+     if(paramEmpty) paramEmpty.style.display = 'block'; 
+     if(paramMain) paramMain.classList.add('hidden');
+  });
 }
 
 // Initialization

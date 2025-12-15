@@ -28,6 +28,7 @@ const volumeValue = document.getElementById('volumeValue');
 
 const timelineCanvasEl = document.getElementById('timelineCanvas');
 const assetCanvas1El = document.getElementById('assetCanvas1');
+const assetCanvas2El = document.getElementById('assetCanvas2');
 
 // asset library
 document.querySelectorAll('.Asset_library_header .tab').forEach(tab => {
@@ -633,6 +634,7 @@ let waveformLines = [];
 // Fabric timeline state (工程時間系統)
 let timescale_canvas = null;
 let asset_canvas1 = null; 
+let asset_canvas2 = null;
 let timelineOffset = 0; // seconds at left edge
 let secondsPerPixel = 1 / 100; // initial: 1px = 0.01s
 const minZoom = 1 / 500;
@@ -1240,6 +1242,17 @@ window.addEventListener('resize', () => {
   if (!timescale_canvas) return;
   timescale_canvas.setWidth(timelineCanvasEl.clientWidth);
   timescale_canvas.setHeight(timelineCanvasEl.clientHeight);
+  if (asset_canvas1) {
+      asset_canvas1.setWidth(assetCanvas1El.clientWidth);
+      asset_canvas1.setHeight(assetCanvas1El.clientHeight);
+      asset_canvas1.requestRenderAll();
+  }
+
+  if (asset_canvas2 && assetCanvas2El) {
+      asset_canvas2.setWidth(assetCanvas2El.clientWidth);
+      asset_canvas2.setHeight(assetCanvas2El.clientHeight);
+      asset_canvas2.requestRenderAll();
+  }
   drawTimeline();
 });
 
@@ -1250,18 +1263,104 @@ function updateTimeUI() {
 }
 
 //重置效果方塊外框
-function resetAllStrokes() {
-      asset_canvas1.getObjects().forEach(obj => {
-          // 確保它是 Group 且內部有背景方塊 (item(0))
-          if (obj.type === 'group' && obj.item(0)) {
-              obj.item(0).set({
-                  stroke: '#ffffff', // 預設白色
-                  strokeWidth: 1     // 預設細線
-              });
-          }
+function resetAllStrokes(canvas) {
+  if(!canvas) return;
+  canvas.getObjects().forEach(obj => {
+    // 確保它是 Group 且內部有背景方塊 (item(0))
+    if (obj.type === 'group' && obj.item(0)) {
+      obj.item(0).set({
+        stroke: '#ffffff', // 預設白色
+        strokeWidth: 1     // 預設細線
       });
+    }
+  });
+  canvas.requestRenderAll();
+}
+//載入參數
+function loadAssetParams(e) {
+      let activeObj = e.target;
+      if (!activeObj && e.selected && e.selected.length > 0) {
+        activeObj = e.selected[0];
+    }
+      if (!activeObj || !activeObj.logicBlock){
+        return;
+      } 
+      // 從 Fabric 物件中取出我們的 Class 實例
+      const block = activeObj.logicBlock;
+      console.log(`[選取 ID:${block.id}] 目前資料庫內容:`, JSON.parse(JSON.stringify(globalEffectData)))
+      // 印出整個物件結構，展開來檢查
+      console.dir(block);
+      // 先重置所有顏色，再將當前物件設為藍色
+      resetAllStrokes(asset_canvas1);
+      resetAllStrokes(asset_canvas2);
+      if (activeObj.item(0)) {
+          activeObj.item(0).set({
+              stroke: '#00aaff',
+              strokeWidth: 2     
+          });
+      }
+      // 上鎖 + 記錄 ID
+      isRestoring = true;
+      currentEditingId = block.id;
+      // 切換 UI
+      switchEffectUI(block.name);
+      // 清空面板
+      resetAllParams();
+      // 填入參數
+      if (block.params) {
+          restorePanelParams(block.params);
+      }
+
+      // 解鎖
+      setTimeout(() => {
+          isRestoring = false;
+      }, 10);
+      activeObj.canvas.requestRenderAll();
   }
 
+// 存檔同步函式
+function syncParamsToActiveObject(e) {
+  // 檢查鎖
+  if (typeof isRestoring !== 'undefined' && isRestoring) return;
+  if (!currentEditingId) return;
+
+  // 自動偵測目前是哪個畫布被選取
+  let activeObj = null;
+  
+  // 先找 Canvas 1
+  if (asset_canvas1) {
+      const obj = asset_canvas1.getActiveObject();
+      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
+          activeObj = obj;
+      }
+  }
+  // 如果 Canvas 1 沒找到，找 Canvas 2
+  if (!activeObj && asset_canvas2) {
+      const obj = asset_canvas2.getActiveObject();
+      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
+          activeObj = obj;
+      }
+  }
+
+  // 如果都沒找到對應 ID 的物件，就不執行
+  if (!activeObj) return;
+
+  const block = activeObj.logicBlock;
+
+  // 抓取參數並存檔
+  const currentParams = capturePanelParams();
+  console.log(`[存檔] ID:${block.id} 參數更新`, currentParams);
+
+  block.params = currentParams;
+  
+  // 同步回全域資料庫 (確保匯出時也是最新的)
+  if(window.globalEffectData[block.id]) {
+      Object.assign(window.globalEffectData[block.id], currentParams);
+  }
+
+  // 渲染該畫布
+  activeObj.canvas.requestRenderAll();
+}
 // 初始化 Asset Canvas1 的 Fabric 畫布
 function initAsset1Fabric() {
   if (!assetCanvas1El) {
@@ -1299,121 +1398,113 @@ function initAsset1Fabric() {
   });
   // 事件監聽整合區
 
+  // 定義選取處理函式
+  const handleCanvas1Selection = (e) => {
+      // 互斥鎖：如果 Canvas2 有選取物件，強制取消，確保下次點擊能觸發 created
+      if (asset_canvas2 && asset_canvas2.getActiveObject()) {
+          asset_canvas2.discardActiveObject(); 
+          asset_canvas2.requestRenderAll();
+      }
+      loadAssetParams(e);
+  };
   // 選取方塊時：讀取參數
-  asset_canvas1.on('selection:created', loadAssetParams);
-  asset_canvas1.on('selection:updated', loadAssetParams);
+  asset_canvas1.on('selection:created', handleCanvas1Selection);
+  asset_canvas1.on('selection:updated', handleCanvas1Selection);
   
   // 取消選取時：隱藏面板 + 全部變回白色
   asset_canvas1.on('selection:cleared', () => {
-     resetAllStrokes(); 
-     currentEditingId = null;
-     paramEmpty.style.display = 'block'; 
-     paramMain.classList.add('hidden');
+     resetAllStrokes(asset_canvas1); 
+     // 兩個畫布都沒有選取物件時，才隱藏面板，避免切換畫布時，瞬間閃爍或隱藏
+     setTimeout(() => {
+         // 檢查兩個畫布現在是否真的都沒有選取物件
+         const c1Has = asset_canvas1 && asset_canvas1.getActiveObject();
+         const c2Has = asset_canvas2 && asset_canvas2.getActiveObject();
+         // 只有當「兩邊都沒東西」時，才隱藏面板
+         if (!c1Has && !c2Has) {
+             currentEditingId = null;
+             if (paramEmpty) paramEmpty.style.display = 'block'; 
+             if (paramMain) paramMain.classList.add('hidden');
+         }
+     }, 10);
      asset_canvas1.requestRenderAll();
   });
-
-  function loadAssetParams(e) {
-    // 容錯寫法
-      const activeObj = e.selected ? e.selected[0] : asset_canvas1.getActiveObject();
-      
-      if (!activeObj || !activeObj.logicBlock) return;
-      // 從 Fabric 物件中取出我們的 Class 實例
-      const block = activeObj.logicBlock;
-      console.log(`[選取 ID:${block.id}] 目前資料庫內容:`, JSON.parse(JSON.stringify(globalEffectData)))
-      // 印出整個物件結構，展開來檢查
-      console.dir(block);
-      // 先重置所有顏色，再將當前物件設為藍色
-      resetAllStrokes();
-      
-      if (activeObj.item(0)) {
-          activeObj.item(0).set({
-              stroke: '#00aaff',
-              strokeWidth: 2     
-          });
-      }
-      // 上鎖 + 記錄 ID
-      isRestoring = true;
-      currentEditingId = block.id;
-      // 切換 UI
-      switchEffectUI(block.name);
-      // 清空面板
-      resetAllParams();
-      // 填入參數
-      if (block.params) {
-          restorePanelParams(block.params);
-      }
-
-      // 解鎖
-      setTimeout(() => {
-          isRestoring = false;
-      }, 10);
-  }
-
-  // 面板操作時：同步回方塊
-  paramMain.removeEventListener('input', syncParamsToActiveObject);
-  paramMain.removeEventListener('change', syncParamsToActiveObject);
   
-  paramMain.addEventListener('input', syncParamsToActiveObject);
-  paramMain.addEventListener('change', syncParamsToActiveObject);
-
-function syncParamsToActiveObject(e) {
-
-      // 檢查鎖
-      if (typeof isRestoring !== 'undefined' && isRestoring) return;
-
-      // 如果目前沒有正在編輯的 Canvas ID，就不執行存檔，直接 return，讓數值保留在輸入框裡
-      if (!currentEditingId) {
-          return;
-      }
-
-      // 檢查選取物件
-      const activeObj = asset_canvas1.getActiveObject();
-      if (!activeObj || !activeObj.logicBlock) {
-          return;
-      }
-
-      const block = activeObj.logicBlock;
-
-      // 檢查 ID 是否匹配
-      if (block.id !== currentEditingId) {;
-        return;
-    }
-
-      // 嘗試抓取參數
-      const currentParams = capturePanelParams();
-      console.log("🔎 抓取到的參數內容:", currentParams);
-
-
-      // 寫入資料庫
-      block.params = currentParams;
-      console.log(`✅ 成功寫入 ID:${block.id}。資料庫目前狀態:`, globalEffectData);
-  }
-
-
   asset_canvas1.requestRenderAll();
+}
+
+// 初始化 Asset2 Canvas 的 Fabric 畫布
+function initAsset2Fabric() {
+  if (!assetCanvas2El) return;
+  
+  assetCanvas2El.width = assetCanvas2El.clientWidth;
+  assetCanvas2El.height = assetCanvas2El.clientHeight;
+
+  asset_canvas2 = new fabric.Canvas("assetCanvas2", {
+    selection: true,
+    renderOnAddRemove: true
+  });
+  
+  asset_canvas2.setWidth(assetCanvas2El.clientWidth);
+  asset_canvas2.setHeight(assetCanvas2El.clientHeight);
+
+  // 處理拖曳放下 (Drop)
+  const canvasContainer = asset_canvas2.wrapperEl;
+  canvasContainer.addEventListener('dragover', (e) => {
+    e.preventDefault(); 
+    e.dataTransfer.dropEffect = 'copy';
+  });
+
+  canvasContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!asset_canvas2) return;
+    const pointer = asset_canvas2.getPointer(e);
+    const assetName = e.dataTransfer.getData('text/plain');
+    // 傳入 asset_canvas2 作為目標
+    createAssetOnCanvas(assetName, pointer.x, pointer.y, asset_canvas2);
+  });
+
+  // 事件監聽：選取時載入參數
+  const handleCanvas2Selection = (e) => {
+      // 互斥鎖：選取畫布2時，強制取消畫布1的選取
+      if(asset_canvas1 && asset_canvas1.getActiveObject()) {
+          asset_canvas1.discardActiveObject();
+          asset_canvas1.requestRenderAll();
+      }
+      loadAssetParams(e);
+  };
+  asset_canvas2.on('selection:created', handleCanvas2Selection);
+  asset_canvas2.on('selection:updated', handleCanvas2Selection);
+  
+  asset_canvas2.on('selection:cleared', () => {
+     resetAllStrokes(asset_canvas2);
+     // 檢查 Canvas 1 是否有選取，避免誤關面板
+     setTimeout(() => {
+         const c1Has = asset_canvas1 && asset_canvas1.getActiveObject();
+         const c2Has = asset_canvas2 && asset_canvas2.getActiveObject();
+
+         if (!c1Has && !c2Has) {
+             currentEditingId = null;
+             if(paramEmpty) paramEmpty.style.display = 'block'; 
+             if(paramMain) paramMain.classList.add('hidden');
+         }
+     }, 10);
+  });
 }
 
 // 根據時間軸的 Offset 和 Zoom 更新素材位置
 function updateAssetPositions() {
-  if (!asset_canvas1) return;
-
-  asset_canvas1.getObjects().forEach(obj => {
-    // 1. 檢查有沒有 logicBlock (靈魂)
-    if (obj.logicBlock) {
-      
-      // ▼▼▼【絕對不能漏掉這一行】▼▼▼
-      const block = obj.logicBlock; 
-      // ▲▲▲ 定義 block 變數，不然下面會報錯 block is not defined ▲▲▲
-
-      // 2. 現在可以使用 block 了
-      if (block.startTime !== undefined) {
-          
+  // 同時更新兩個畫布
+  [asset_canvas1, asset_canvas2].forEach(canvas => {
+    if (!canvas) return;
+    canvas.getObjects().forEach(obj => {
+      // 檢查有沒有 logicBlock 
+      if (obj.logicBlock) {
+        const block = obj.logicBlock;
+        if (block.startTime !== undefined) {   
           // 計算新的 X 座標
           const newLeft = (block.startTime - timelineOffset) / secondsPerPixel;
-          
           obj.left = newLeft;
-
-          // 3. 更新寬度 (縮放)
+          // 更新寬度 (縮放)
           if (block.duration !== undefined && obj.width > 0) {
               const targetWidthPx = block.duration / secondsPerPixel;
               
@@ -1429,15 +1520,19 @@ function updateAssetPositions() {
               }
           }
           obj.setCoords(); 
+        }
       }
-    }
+    })
+    canvas.requestRenderAll();
   });
 
-  asset_canvas1.requestRenderAll();
+  
 }
 
-function createAssetOnCanvas(assetName, x, y) {
-    if (!asset_canvas1) return;
+function createAssetOnCanvas(assetName, x, y, targetCanvas) {
+    // 如果沒傳目標，預設為 canvas1
+    targetCanvas = targetCanvas || asset_canvas1;
+    if (!targetCanvas) return;
     // 產生 ID
     const currentId = globalAssetIdCounter++;
 
@@ -1463,7 +1558,8 @@ function createAssetOnCanvas(assetName, x, y) {
     globalEffectData[currentId] = {
       ...finalParams,
       id: currentId,         
-      name: assetName.trim()  
+      name: assetName.trim(),
+      layer: (targetCanvas === asset_canvas2) ? 2 : 1 // 記錄是哪一層  
     }; 
     console.log(`[資料庫] 已新增 ID:${currentId} 的數據`, globalEffectData[currentId]);
 
@@ -1473,55 +1569,50 @@ function createAssetOnCanvas(assetName, x, y) {
     // 渲染 (傳入 canvas 與 x, y)
     // 注意：原本的 y 是在函式內算，現在可以傳入函式參數的 y，或是維持內部計算
     // 如果想要精準控制在 assetCanvas1 的中間，可以這樣寫：
-    const centerY = asset_canvas1.getHeight() / 2;
-    const group = newBlock.render(asset_canvas1, x, centerY);
+    const centerY = targetCanvas.getHeight() / 2;
+    const group = newBlock.render(targetCanvas, x, centerY);
 
     // 選取它
-    asset_canvas1.setActiveObject(group);
-    asset_canvas1.fire('selection:created', { target: group, selected: [group] });
-    asset_canvas1.requestRenderAll();
+    targetCanvas.setActiveObject(group);
+    targetCanvas.fire('selection:created', { target: group, selected: [group] });
+    targetCanvas.requestRenderAll();
 
     console.log(`已建立 Block Class ID: ${newBlock.id}`);
 }
 //delete功能
 window.addEventListener('keydown', (e) => {
-    // 1. 檢查按鍵是否為 Delete
-    if (e.key === 'Delete') {
-        
-        // 2. 安全檢查：如果使用者正在輸入框 (input) 或文字區域打字，忽略刪除指令
-        if (document.activeElement.tagName === 'INPUT' || 
-            document.activeElement.tagName === 'TEXTAREA') {
-            return;
-        }
-
-        if (!asset_canvas1) return;
-
-        // 3. 取得目前選取的物件
-        const activeObjects = asset_canvas1.getActiveObjects();
-
-        if (activeObjects.length) {
-            // 清除目前的選取框，避免刪除後殘留藍色框線
-            asset_canvas1.discardActiveObject();
-
-            // 4. 遍歷並移除所有選取的物件
-            activeObjects.forEach((obj) => {
-              // 刪除效果方塊對應的資料
-                if (obj.logicBlock) {
-                    const idToDelete = obj.logicBlock.id;
-                    delete globalEffectData[idToDelete]; // 從物件中移除
-                    console.log(`[資料庫] 已移除 ID:${idToDelete} 的數據`);
-                }
-                asset_canvas1.remove(obj);
-            });
-            // 清空面板與 ID 紀錄
-            currentEditingId = null;
-            resetAllStrokes(); 
-            if (paramEmpty) paramEmpty.style.display = 'block'; 
-            if (paramMain) paramMain.classList.add('hidden');
-
-            asset_canvas1.requestRenderAll();
-        }
+  // 檢查按鍵是否為 Delete
+  if (e.key === 'Delete') {    
+    // 安全檢查：如果使用者正在輸入框 (input) 或文字區域打字，忽略刪除指令
+    if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
+      return;
     }
+      // 檢查兩個畫布
+      [asset_canvas1, asset_canvas2].forEach(canvas => {
+        if(!canvas) return;
+        const activeObjects = canvas.getActiveObjects();
+        if (activeObjects.length) {
+          // 清除目前的選取框，避免刪除後殘留藍色框線
+          canvas.discardActiveObject();
+          // 遍歷並移除所有選取的物件
+          activeObjects.forEach((obj) => {
+            // 刪除效果方塊對應的資料
+            if (obj.logicBlock) {
+              delete globalEffectData[obj.logicBlock.id];
+            }
+            canvas.remove(obj);
+          });
+          // 清空面板與 ID 紀錄
+          currentEditingId = null;
+          resetAllStrokes(); 
+          if (paramEmpty) paramEmpty.style.display = 'block'; 
+          if (paramMain) paramMain.classList.add('hidden');
+          canvas.requestRenderAll();
+        }
+      });
+
+
+  }
 });
 // Initialization
 function initAll() {
@@ -1539,7 +1630,8 @@ function initAll() {
   timelineCanvasEl.height = timelineCanvasEl.clientHeight;
 
   initTimelineFabric();
-  initAsset1Fabric()
+  initAsset1Fabric();
+  //initAsset2Fabric();
   // set initial audio volume
   audio.volume = (volumeSlider.value || 100) / 100;
 
@@ -1892,84 +1984,86 @@ if (btnDeleteCustom) {
 //  JSON 匯出功能 (Export to JSON)
 
 function generateProjectJson() {
-    if (typeof asset_canvas1 !== 'undefined' && asset_canvas1) {
-        const objects = asset_canvas1.getObjects();
-        
-        objects.forEach(obj => {
-            // 確保物件有靈魂 (logicBlock)
-            if (obj.logicBlock && obj.logicBlock.id) {
-                const id = obj.logicBlock.id;
-                
-                // 1. 計算目前的正確時間 (防止負值)
-                let currentStartTime = timelineOffset + obj.left * secondsPerPixel;
-                if (currentStartTime < 0) currentStartTime = 0;
-
-                // 2. 計算目前的正確長度
-                // 寬度 * 縮放比例 * 每像素秒數
-                let currentDuration = (obj.width * obj.scaleX) * secondsPerPixel;
-                // 3. 更新全域資料庫
-                if (window.globalEffectData[id]) {
-                    window.globalEffectData[id].startTime = currentStartTime;
-                    window.globalEffectData[id].duration = currentDuration;
-                } else {
-                    // 防呆：如果資料庫意外遺失該 ID，嘗試補救 (選用)
-                    console.warn(`ID ${id} 存在於畫布但不在資料庫中`);
-                }
-            }
-        });
-        console.log("✅ 已完成畫面與資料庫的幾何同步");
-    }
-    // 取出所有方塊數據並轉為陣列
-    const allBlocks = Object.values(window.globalEffectData || {});
-
-    // 根據 startTime 排序 (由早到晚)
-    allBlocks.sort((a, b) => a.startTime - b.startTime);
-
-    // 轉換格式
-    const exportData = allBlocks.map(block => {
-      // 宣告變數並給予預設值
-        let modeStr = "MODES_CLEAR";
-        // 從 MODE_MAP 找中文名稱對應的 Key
-        if (block.name) {
-            modeStr = MODE_MAP[block.name];
+  // 匯入時偵測到有第二層的資料，就自動觸發開啟第二個效果畫布
+  const canvases = [asset_canvas1];
+  if (asset_canvas2) canvases.push(asset_canvas2);
+  // 掃描兩個畫布來更新 globalEffectData 的幾何資訊
+  [asset_canvas1, asset_canvas2].forEach((canvas, index) => {
+    if(!canvas) return;
+    const currentLayer = index + 1; // canvas1 => layer 1, canvas2 => layer 2
+    canvas.getObjects().forEach(obj => {
+      if (obj.logicBlock && obj.logicBlock.id) {
+        // 計算 startTime/duration
+        const id = obj.logicBlock.id;
+        // 計算目前的正確時間 (防止負值)
+        let currentStartTime = timelineOffset + obj.left * secondsPerPixel;
+        if (currentStartTime < 0) currentStartTime = 0;
+        // 計算目前的正確長度
+        // 寬度 * 縮放比例 * 每像素秒數
+        let currentDuration = (obj.width * obj.scaleX) * secondsPerPixel;
+        // 順便更新它在哪一層 (Layer)
+        if(window.globalEffectData[id]) {
+          window.globalEffectData[id].layer = (canvas === asset_canvas2) ? 2 : 1;
+          window.globalEffectData[id].startTime = currentStartTime;
+          window.globalEffectData[id].duration = currentDuration;
         }
-        console.log(`[處理中] ID:${block.id || '?'} | 原始名字: "${block.name}" `);
-        // 時間轉換 (秒 -> 毫秒)
-        const startTimeMs = Math.round((block.startTime || 0) * 1000);
-        const durationMs = Math.round((block.duration || 0) * 1000);
+      }
+    });
+  });
+  // 取出所有方塊數據並轉為陣列
+  const allBlocks = Object.values(window.globalEffectData || {});
 
-        // HSV 打包 helper
-        const packHsv = (prefix) => {
-            const funcStr = block[`${prefix}_func`] || "none";
-            const funcCode = FUNC_CODE[funcStr] || 0;
-            // 判斷最大值
-            const isHue = prefix.includes('H'); 
-            const maxVal = isHue ? 359 : 100;
-            // 讀取數值 (如果沒有該欄位則預設 0)
-            const originalRange = block[`${prefix}_range`] || 0;
-            const oringinalLower = block[`${prefix}_lower`] || 0;
-            const range = normalizeTo255(originalRange, 0, maxVal);
-            const lower = normalizeTo255(oringinalLower, 0, maxVal);
-            let p1 = 0, p2 = 0;
+  // 根據 startTime 排序 (由早到晚)
+  const layer1Blocks = allBlocks.filter(b => b.layer !== 2).sort((a, b) => a.startTime - b.startTime);
+  const layer2Blocks = allBlocks.filter(b => b.layer === 2).sort((a, b) => a.startTime - b.startTime);
 
-            // 根據 Function 決定 p1, p2 來源
-            // 邏輯參照原本的 packHsvBlock
-            if (funcCode === 1) { // Const
-                const originalValue  = block[`${prefix}_value`] || 0;
-                p1 = normalizeTo255(originalValue, 0, maxVal);
-            } else if (funcCode === 2 || funcCode === 3) { // Ramp, Tri
-                const originalUpper = block[`${prefix}_upper`] || 0;
-                p1 = normalizeTo255(originalUpper, 0, maxVal);
-            } else if (funcCode === 4) { // Pulse
-                const originalTop = block[`${prefix}_top`] || 0;
-                p1 = normalizeTo255(originalTop, 0, maxVal);
-            } else if (funcCode === 5) { // Step
-                const originalHeight = block[`${prefix}_height`] || 0;
-                p1 = normalizeTo255(originalHeight, 0, maxVal);
-                p2 = block[`${prefix}_step`] || 0;
-            }
+  // 轉換格式
+  const exportData = (block) => {
+    // 宣告變數並給予預設值
+    let modeStr = "MODES_CLEAR";
+    // 從 MODE_MAP 找中文名稱對應的 Key
+    if (block.name) {
+      modeStr = MODE_MAP[block.name];
+    }
+    console.log(`[處理中] ID:${block.id || '?'} | 原始名字: "${block.name}" `);
+    // 時間轉換 (秒 -> 毫秒)
+    const startTimeMs = Math.round((block.startTime || 0) * 1000);
+    const durationMs = Math.round((block.duration || 0) * 1000);
 
-            return { func: funcCode, range, lower, p1, p2 };
+    // HSV 打包 helper
+    const packHsv = (prefix) => {
+      const funcStr = block[`${prefix}_func`] || "none";
+      const funcCode = FUNC_CODE[funcStr] || 0;
+      // 判斷最大值
+      const isHue = prefix.includes('H'); 
+      const maxVal = isHue ? 359 : 100;
+      // 讀取數值 (如果沒有該欄位則預設 0)
+      const originalRange = block[`${prefix}_range`] || 0;
+      const originalLower = block[`${prefix}_lower`] || 0;
+      const range = normalizeTo255(originalRange, 0, maxVal);
+      const lower = normalizeTo255(originalLower, 0, maxVal);
+      let p1 = 0, p2 = 0;
+
+      // 根據 Function 決定 p1, p2 來源
+      // 邏輯參照原本的 packHsvBlock
+      if (funcCode === 1) { // Const
+        const originalValue  = block[`${prefix}_value`] || 0;
+        p1 = normalizeTo255(originalValue, 0, maxVal);
+      }
+       else if (funcCode === 2 || funcCode === 3) { // Ramp, Tri
+        const originalUpper = block[`${prefix}_upper`] || 0;
+        p1 = normalizeTo255(originalUpper, 0, maxVal);
+      }
+       else if (funcCode === 4) { // Pulse
+        const originalTop = block[`${prefix}_top`] || 0;
+        p1 = normalizeTo255(originalTop, 0, maxVal);
+        } 
+      else if (funcCode === 5) { // Step
+        const originalHeight = block[`${prefix}_height`] || 0;
+        p1 = normalizeTo255(originalHeight, 0, maxVal);
+        p2 = block[`${prefix}_step`] || 0;
+        }
+      return { func: funcCode, range, lower, p1, p2 };
         };
 
         // P1-P4 額外參數打包 helper
@@ -2025,9 +2119,10 @@ function generateProjectJson() {
             YV: packHsv("YV"),
             p1, p2, p3, p4
         };
-    });
+    };
 
-    return [exportData];
+    return [layer1Blocks.map(exportData),
+      layer2Blocks.map(exportData)];
 }
 
 // 綁定按鈕事件
@@ -2173,73 +2268,81 @@ function importProjectFromJson(jsonArray) {
     }
 
     // 刪除所有方塊
-    if (asset_canvas1) {
-        asset_canvas1.clear();
-        // 重設全域變數
-        window.globalEffectData = {};
-        currentEditingId = null;
+    
+    if(asset_canvas1) asset_canvas1.clear();
+    if(asset_canvas2) asset_canvas2.clear();
+    // 重設全域變數
+    window.globalEffectData = {};
+    currentEditingId = null;
         
-        // 隱藏參數面板
-        if (paramEmpty) paramEmpty.style.display = 'block'; 
-        if (paramMain) paramMain.classList.add('hidden');
+    // 隱藏參數面板
+    if (paramEmpty) paramEmpty.style.display = 'block'; 
+    if (paramMain) paramMain.classList.add('hidden');
+
+    // 檢查是否有第二軌資料，若有且畫布未開，則自動開啟
+    const layer2Data = jsonArray[1]; // 陣列第二個元素
+    if (layer2Data && layer2Data.length > 0 && !asset_canvas2) {
+        console.log("偵測到軌道 2 資料，自動開啟畫布...");
+        const t2c = document.getElementById('track2Container');
+        if (t2c) t2c.style.display = 'block';
+        
+        const btnAdd = document.getElementById('btnAddTrack');
+        if (btnAdd) btnAdd.style.display = 'none';
+        
+        initAsset2Fabric(); 
     }
+    // 3. 定義單個軌道的還原函式
+    const restoreTrack = (trackData, targetCanvas, layerId) => {
+        if (!trackData || !targetCanvas) return;
 
-    // 逐一重建方塊
-    jsonArray.forEach(blockData => {
-        // 準備基本資料
-        const modeStr = blockData.mode || "MODES_PLAIN";
-        const assetName = MODE_MAP_INV[modeStr] || "純色"; // 反查中文名 (如 "扇形")
-        const currentId = globalAssetIdCounter++; // 產生新 ID
-        
-        // 時間轉換 (毫秒 -> 秒)
-        const startTimeSec = (blockData.start_time || 0) / 1000;
-        const durationSec  = (blockData.duration || 0) / 1000;
+        trackData.forEach(blockData => {
+            const modeStr = blockData.mode || "MODES_PLAIN";
+            const assetName = MODE_MAP_INV[modeStr] || "純色";
+            const currentId = globalAssetIdCounter++;
+            
+            const startTimeSec = (blockData.start_time || 0) / 1000;
+            const durationSec  = (blockData.duration || 0) / 1000;
 
-        // 解包參數
-        let restoredParams = {};
-        
-        // 解包 HSV
-        ["XH", "XS", "XV", "YH", "YS", "YV"].forEach(key => {
-            const hsvParams = unpackHsvToParams(key, blockData[key]);
-            Object.assign(restoredParams, hsvParams);
+            let restoredParams = {};
+            
+            // 解包 HSV
+            ["XH", "XS", "XV", "YH", "YS", "YV"].forEach(key => {
+                Object.assign(restoredParams, unpackHsvToParams(key, blockData[key]));
+            });
+            // 解包 Extras
+            Object.assign(restoredParams, unpackExtrasToParams(modeStr, blockData.p1, blockData.p2, blockData.p3, blockData.p4));
+
+            // 寫入資料庫 (強制指定 layer)
+            window.globalEffectData[currentId] = {
+                ...restoredParams,
+                id: currentId,
+                name: assetName,
+                startTime: startTimeSec,
+                duration: durationSec,
+                layer: layerId 
+            };
+            // 建立並渲染方塊
+            const newBlock = new EffectBlock(currentId, assetName);
+            newBlock.params = restoredParams;
+            newBlock.startTime = startTimeSec;
+            newBlock.duration = durationSec;
+
+            const targetX = (startTimeSec - timelineOffset) / secondsPerPixel;
+            const centerY = targetCanvas.getHeight() / 2;
+            const group = newBlock.render(targetCanvas, targetX, centerY);
+
+            newBlock.updateDimensionsFromTime(); // 確保長度正確
+            group.setCoords();
         });
-
-        // 解包 Extras
-        const extrasParams = unpackExtrasToParams(modeStr, blockData.p1, blockData.p2, blockData.p3, blockData.p4);
-        Object.assign(restoredParams, extrasParams);
-
-        // 寫入資料庫
-        window.globalEffectData[currentId] = {
-            ...restoredParams,
-            id: currentId,
-            name: assetName,
-            startTime: startTimeSec,
-            duration: durationSec
-        };
-
-        // 在畫布上建立實體
-        const newBlock = new EffectBlock(currentId, assetName);
-        newBlock.params = restoredParams;
         
-        // 設定時間
-        newBlock.startTime = startTimeSec;
-        newBlock.duration = durationSec;
+        targetCanvas.requestRenderAll();
+    };
+    // 4. 執行還原：索引0 -> 畫布1，索引1 -> 畫布2
+    if (jsonArray[0]) restoreTrack(jsonArray[0], asset_canvas1, 1);
+    if (jsonArray[1]) restoreTrack(jsonArray[1], asset_canvas2, 2);
 
-        // 計算對應的 X 座標
-        const targetX = (startTimeSec - timelineOffset) / secondsPerPixel;
-        const centerY = asset_canvas1.getHeight() / 2;
-
-        // 渲染
-        const group = newBlock.render(asset_canvas1, targetX, centerY);
-        
-        // render內部會根據預設寬度重算 duration，我們要強制用存檔的 duration 來縮放
-        newBlock.duration = durationSec;
-        newBlock.updateDimensionsFromTime(); // 這是 EffectBlock 裡的方法，讓寬度符合 duration
-        group.setCoords();
-    });
-
-    asset_canvas1.requestRenderAll();
-    console.log(`[匯入成功] 共還原 ${jsonArray.length} 個方塊`);
+    console.log(`[匯入成功] 已還原軌道資料`);
+    
 }
 
 // 綁定匯入按鈕事件
@@ -2270,17 +2373,13 @@ if (btnImport && fileInputImport) {
                     // 偵測是否為 2D 陣列 (檢查第一個元素是不是也是陣列)
                     if (rawData.length > 0 && Array.isArray(rawData[0])) {
                         
-                        // 使用 .flat() 將 [[A,B], [C,D]] 變成 [A,B,C,D]
-                        finalData = rawData.flat(); 
+                        importProjectFromJson(rawData);
                     } 
                     // 否則就是標準的 1D 陣列
                     else {
-                        console.log("✅ 偵測到標準 1D 陣列");
                         finalData = rawData;
+                        importProjectFromJson([rawData, []]);
                     }
-
-                    // 執行匯入
-                    importProjectFromJson(finalData);
 
                 } else {
                     // 如果根本不是陣列 (例如是單純的 Object)
@@ -2439,3 +2538,35 @@ function stopControlPolling() {
 
 // 初始化 UI
 initControlPanelUI();
+//新增效果畫布按鈕
+const btnAddTrack = document.getElementById('btnAddTrack');
+const track2Container = document.getElementById('track2Container');
+
+if (btnAddTrack && track2Container) {
+    btnAddTrack.addEventListener('click', () => {
+        // 1. 顯示容器 (先顯示，讓瀏覽器算出寬度)
+        track2Container.style.display = 'block';
+        
+        // 2. 隱藏按鈕 (避免重複按，或者你可以改成 toggle)
+        btnAddTrack.style.display = 'none';
+
+        // 3. 檢查是否已經初始化過，沒有才執行
+        if (!asset_canvas2) {
+            // 因為剛剛才 display: block，建議稍微延遲 0ms 確保渲染完成 (選用，通常直接跑也可以)
+            setTimeout(() => {
+                initAsset2Fabric();
+                console.log("軌道 2 已啟用");
+            }, 0);
+        }
+    });
+}
+// 全域綁定面板 Input 事件 (確保參數修改能存回方塊)
+if (paramMain) {
+    // 先移除舊的避免重複
+    paramMain.removeEventListener('input', syncParamsToActiveObject);
+    paramMain.removeEventListener('change', syncParamsToActiveObject);
+    
+    // 綁定
+    paramMain.addEventListener('input', syncParamsToActiveObject);
+    paramMain.addEventListener('change', syncParamsToActiveObject);
+}

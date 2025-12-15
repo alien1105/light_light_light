@@ -1,0 +1,210 @@
+[
+  [
+    {
+      "mode": "MODES_CMAP_FIRE",
+      "start_time": 3260,
+      "duration": 2544,
+      "XH": {
+        "func": 2,
+        "range": 140,
+        "lower": 78,
+        "p1": 162,
+        "p2": 0
+      },
+      "XS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "XV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YH": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 50
+    },
+    {
+      "mode": "MODES_BOXES",
+      "start_time": 11562,
+      "duration": 2026,
+      "XH": {
+        "func": 3,
+        "range": 139,
+        "lower": 69,
+        "p1": 36,
+        "p2": 0
+      },
+      "XS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "XV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YH": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 137,
+      "p4": 66
+    }
+  ],
+  [
+    {
+      "mode": "MODES_CMAP_FIRE",
+      "start_time": 5060,
+      "duration": 1000,
+      "XH": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 98,
+        "p2": 0
+      },
+      "XS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "XV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YH": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 115
+    },
+    {
+      "mode": "MODES_FAN",
+      "start_time": 8501,
+      "duration": 1000,
+      "XH": {
+        "func": 4,
+        "range": 112,
+        "lower": 75,
+        "p1": 207,
+        "p2": 0
+      },
+      "XS": {
+        "func": 2,
+        "range": 77,
+        "lower": 69,
+        "p1": 171,
+        "p2": 0
+      },
+      "XV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YH": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YS": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "YV": {
+        "func": 0,
+        "range": 0,
+        "lower": 0,
+        "p1": 0,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 6,
+      "p4": 34
+    }
+  ]
+]
