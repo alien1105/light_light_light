@@ -2372,7 +2372,7 @@ function importProjectFromJson(jsonArray) {
 
     // 取得 DOM 元素
     const t2c = document.getElementById('track2Container');
-    const btn2 = document.getElementById('btnAddTrack');
+    const btn2 = document.getElementById('btnAddTrack2');
     const t3c = document.getElementById('track3Container');
     const btn3 = document.getElementById('btnAddTrack3');
 
@@ -2394,7 +2394,8 @@ function importProjectFromJson(jsonArray) {
             // 如果畫布本來就開著，清空它準備放新資料
             asset_canvas2.clear(); 
         }
-    } else {
+    } 
+    else {
         // 關閉模式
         // 匯入的檔沒有軌道 2，所以把介面收起來
         if (t2c) t2c.style.display = 'none';      // 隱藏畫布容器
