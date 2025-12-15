@@ -1266,6 +1266,11 @@ window.addEventListener('resize', () => {
       asset_canvas3.setHeight(assetCanvas3El.clientHeight);
       asset_canvas3.requestRenderAll();
   }
+  if (asset_canvas4 && assetCanvas4El) {
+      asset_canvas4.setWidth(assetCanvas4El.clientWidth);
+      asset_canvas4.setHeight(assetCanvas4El.clientHeight);
+      asset_canvas4.requestRenderAll();
+  }
   drawTimeline();
 });
 
@@ -1296,6 +1301,7 @@ function loadAssetParams(e) {
     if (asset_canvas1 && asset_canvas1.getActiveObject()) activeObj = asset_canvas1.getActiveObject();
     else if (asset_canvas2 && asset_canvas2.getActiveObject()) activeObj = asset_canvas2.getActiveObject();
     else if (asset_canvas3 && asset_canvas3.getActiveObject()) activeObj = asset_canvas3.getActiveObject();
+    else if (asset_canvas4 && asset_canvas4.getActiveObject()) activeObj = asset_canvas4.getActiveObject();
   }
   if (!activeObj || !activeObj.logicBlock){
   return;
@@ -1308,11 +1314,13 @@ function loadAssetParams(e) {
   // 選取當前畫布時，取消其他畫布
   if (activeObj.canvas !== asset_canvas1 && asset_canvas1) asset_canvas1.discardActiveObject();
   if (activeObj.canvas !== asset_canvas2 && asset_canvas2) asset_canvas2.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas3 && asset_canvas3) asset_canvas3.discardActiveObject(); 
+  if (activeObj.canvas !== asset_canvas3 && asset_canvas3) asset_canvas3.discardActiveObject();
+  if (activeObj.canvas !== asset_canvas4 && asset_canvas4) asset_canvas4.discardActiveObject(); 
   // 先重置所有顏色，再將當前物件設為藍色
   resetAllStrokes(asset_canvas1);
   resetAllStrokes(asset_canvas2);
   resetAllStrokes(asset_canvas3);
+  resetAllStrokes(asset_canvas4);
   if (activeObj.item(0)) {
     activeObj.item(0).set({
     stroke: '#00aaff',
@@ -1363,6 +1371,13 @@ function syncParamsToActiveObject(e) {
   // 如果 Canvas 2 沒找到，找 Canvas 3
   if (!activeObj && asset_canvas3) {
       const obj = asset_canvas3.getActiveObject();
+      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
+          activeObj = obj;
+      }
+  }
+  // 如果 Canvas 3 沒找到，找 Canvas 4
+  if (!activeObj && asset_canvas4) {
+      const obj = asset_canvas4.getActiveObject();
       if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
           activeObj = obj;
       }
@@ -1454,11 +1469,13 @@ function initAsset1Fabric() {
      resetAllStrokes(asset_canvas1); 
      // 兩個畫布都沒有選取物件時，才隱藏面板，避免切換畫布時，瞬間閃爍或隱藏
      setTimeout(() => {
-         // 檢查兩個畫布現在是否真的都沒有選取物件
-         const c1Has = asset_canvas1 && asset_canvas1.getActiveObject();
-         const c2Has = asset_canvas2 && asset_canvas2.getActiveObject();
-         // 只有當「兩邊都沒東西」時，才隱藏面板
-         if (!c1Has && !c2Has) {
+         // 檢查畫布現在是否真的都沒有選取物件
+         const c1 = asset_canvas1 && asset_canvas1.getActiveObject();
+         const c2 = asset_canvas2 && asset_canvas2.getActiveObject();
+         const c3 = asset_canvas3 && asset_canvas3.getActiveObject();
+         const c4 = asset_canvas2 && asset_canvas4.getActiveObject();
+         // 只有當沒有選取物件時，才隱藏面板
+         if (!c1 && !c2 && !c3 && !c4) {
              currentEditingId = null;
              if (paramEmpty) paramEmpty.style.display = 'block'; 
              if (paramMain) paramMain.classList.add('hidden');
@@ -1517,10 +1534,12 @@ function initAsset2Fabric() {
      resetAllStrokes(asset_canvas2);
      // 檢查 Canvas 1 是否有選取，避免誤關面板
      setTimeout(() => {
-         const c1Has = asset_canvas1 && asset_canvas1.getActiveObject();
-         const c2Has = asset_canvas2 && asset_canvas2.getActiveObject();
+         const c1 = asset_canvas1 && asset_canvas1.getActiveObject();
+         const c2 = asset_canvas2 && asset_canvas2.getActiveObject();
+         const c3 = asset_canvas3 && asset_canvas3.getActiveObject();
+         const c4 = asset_canvas2 && asset_canvas4.getActiveObject();
 
-         if (!c1Has && !c2Has) {
+         if (!c1 && !c2 && !c3 && !c4) {
              currentEditingId = null;
              if(paramEmpty) paramEmpty.style.display = 'block'; 
              if(paramMain) paramMain.classList.add('hidden');
@@ -1565,8 +1584,9 @@ function initAsset3Fabric() {
     const c1 = asset_canvas1 && asset_canvas1.getActiveObject();
     const c2 = asset_canvas2 && asset_canvas2.getActiveObject();
     const c3 = asset_canvas3 && asset_canvas3.getActiveObject();
+    const c4 = asset_canvas4 && asset_canvas4.getActiveObject();
     setTimeout(() => {
-      if (!c1 && !c2 && !c3) {
+      if (!c1 && !c2 && !c3 && !c4) {
         currentEditingId = null;
         if(paramEmpty) paramEmpty.style.display = 'block'; 
         if(paramMain) paramMain.classList.add('hidden');
@@ -1576,10 +1596,59 @@ function initAsset3Fabric() {
      
   asset_canvas3.requestRenderAll();
 }
+
+function initAsset4Fabric() {
+  if (!assetCanvas4El) return;
+  
+  assetCanvas4El.width = assetCanvas4El.clientWidth;
+  assetCanvas4El.height = assetCanvas4El.clientHeight;
+
+  asset_canvas4 = new fabric.Canvas("assetCanvas4", {
+    selection: true,
+    renderOnAddRemove: true
+  });
+  
+  asset_canvas4.setWidth(assetCanvas4El.clientWidth);
+  asset_canvas4.setHeight(assetCanvas4El.clientHeight);
+
+  // 拖曳放下 (Drop)
+  const canvasContainer = asset_canvas4.wrapperEl;
+  canvasContainer.addEventListener('dragover', (e) => { e.preventDefault(); });
+  canvasContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    if (!asset_canvas4) return;
+    const pointer = asset_canvas4.getPointer(e);
+    const assetName = e.dataTransfer.getData('text/plain');
+    createAssetOnCanvas(assetName, pointer.x, pointer.y, asset_canvas4);
+  });
+
+  // --- 事件監聽 ---
+  asset_canvas4.on('selection:created', loadAssetParams);
+  asset_canvas4.on('selection:updated', loadAssetParams);
+  
+  asset_canvas4.on('selection:cleared', () => {
+    resetAllStrokes(asset_canvas4);
+    // 檢查所有畫布
+    const c1 = asset_canvas1 && asset_canvas1.getActiveObject();
+    const c2 = asset_canvas2 && asset_canvas2.getActiveObject();
+    const c3 = asset_canvas3 && asset_canvas3.getActiveObject();
+    const c4 = asset_canvas4 && asset_canvas4.getActiveObject();
+    setTimeout(() => {
+      if (!c1 && !c2 && !c3 && !c4) {
+        currentEditingId = null;
+        if(paramEmpty) paramEmpty.style.display = 'block'; 
+        if(paramMain) paramMain.classList.add('hidden');
+      }
+    }, 20);
+  });
+     
+  asset_canvas4.requestRenderAll();
+}
 // 根據時間軸的 Offset 和 Zoom 更新素材位置
 function updateAssetPositions() {
-  // 同時更新兩個畫布
-  [asset_canvas1, asset_canvas2, asset_canvas3].forEach(canvas => {
+  // 同時更新畫布
+  const targetCanvas = [asset_canvas1, asset_canvas2, asset_canvas3, asset_canvas4]
+  targetCanvas.forEach(canvas => {
     if (!canvas) return;
     canvas.getObjects().forEach(obj => {
       // 檢查有沒有 logicBlock 
@@ -1624,6 +1693,12 @@ function createAssetOnCanvas(assetName, x, y, targetCanvas) {
     // 準備參數
     let finalParams = {};
 
+    // 在這裡先判斷是哪一層
+    let currentLayer = 1;
+    if (targetCanvas === asset_canvas2) currentLayer = 2;
+    if (targetCanvas === asset_canvas3) currentLayer = 3;
+    if (targetCanvas === asset_canvas4) currentLayer = 4;
+
     // 如果拖曳進來的素材等於目前面板顯示的素材就直接抓取面板上的數值，不要 reset
     if (assetName.trim() === currentLibraryAssetName) {
         console.log("使用面板目前的設定建立方塊");
@@ -1644,7 +1719,7 @@ function createAssetOnCanvas(assetName, x, y, targetCanvas) {
       ...finalParams,
       id: currentId,         
       name: assetName.trim(),
-      layer: (targetCanvas === asset_canvas2) ? 2 : 1 // 記錄是哪一層  
+      layer: currentLayer  
     }; 
     console.log(`[資料庫] 已新增 ID:${currentId} 的數據`, globalEffectData[currentId]);
 
@@ -1672,8 +1747,9 @@ window.addEventListener('keydown', (e) => {
     if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA') {
       return;
     }
-      // 檢查兩個畫布
-      [asset_canvas1, asset_canvas2, asset_canvas3].forEach(canvas => {
+      // 檢查畫布
+      const targetCanvas = [asset_canvas1, asset_canvas2, asset_canvas3, asset_canvas4]
+      targetCanvas.forEach(canvas => {
         if(!canvas) return;
         const activeObjects = canvas.getActiveObjects();
         if (activeObjects.length) {
@@ -2073,8 +2149,9 @@ function generateProjectJson() {
   const canvases = [asset_canvas1];
   if (asset_canvas2) canvases.push(asset_canvas2);
   if (asset_canvas3) canvases.push(asset_canvas3);
+  if (asset_canvas4) canvases.push(asset_canvas4);
   // 掃描畫布來更新 globalEffectData 的幾何資訊
-  const targetCanvases = [asset_canvas1, asset_canvas2, asset_canvas3];
+  const targetCanvases = [asset_canvas1, asset_canvas2, asset_canvas3, asset_canvas4];
   targetCanvases.forEach((canvas, index) => {
     if(!canvas) return;
     const currentLayer = index + 1; // canvas1 => layer 1, canvas2 => layer 2
@@ -2104,7 +2181,7 @@ function generateProjectJson() {
   const layer1Blocks = allBlocks.filter(b => b.layer === 1).sort((a, b) => a.startTime - b.startTime);
   const layer2Blocks = allBlocks.filter(b => b.layer === 2).sort((a, b) => a.startTime - b.startTime);
   const layer3Blocks = allBlocks.filter(b => b.layer === 3).sort((a, b) => a.startTime - b.startTime);
-
+  const layer4Blocks = allBlocks.filter(b => b.layer === 4).sort((a, b) => a.startTime - b.startTime);
   // 轉換格式
   const exportData = (block) => {
     // 宣告變數並給予預設值
@@ -2212,6 +2289,7 @@ function generateProjectJson() {
     return [layer1Blocks.map(exportData),
             layer2Blocks.map(exportData),
             layer3Blocks.map(exportData),
+            layer4Blocks.map(exportData)
            ];
 }
 
@@ -2362,6 +2440,7 @@ function importProjectFromJson(jsonArray) {
     if(asset_canvas1) asset_canvas1.clear();
     if(asset_canvas2) asset_canvas2.clear();
     if(asset_canvas3) asset_canvas3.clear();
+    if(asset_canvas4) asset_canvas4.clear();
     // 重設全域變數
     window.globalEffectData = {};
     currentEditingId = null;
@@ -2375,6 +2454,8 @@ function importProjectFromJson(jsonArray) {
     const btn2 = document.getElementById('btnAddTrack2');
     const t3c = document.getElementById('track3Container');
     const btn3 = document.getElementById('btnAddTrack3');
+    const t4c = document.getElementById('track4Container');
+    const btn4 = document.getElementById('btnAddTrack4');
 
     // 自動處理 軌道 2 (有資料開，沒資料關)
     const layer2Data = jsonArray[1];
@@ -2386,7 +2467,7 @@ function importProjectFromJson(jsonArray) {
 
         // 因為軌道 2 開了，所以「新增軌道 3」的按鈕預設要出現 (除非軌道 3 也開了，下面會判斷)
         if (btn3) btn3.style.display = 'block';
-
+        if (btn4) btn4.style.display = 'none';    // 隱藏「新增軌道4」按鈕
         if (!asset_canvas2) {
             console.log("自動開啟軌道 2...");
             initAsset2Fabric(); 
@@ -2403,7 +2484,7 @@ function importProjectFromJson(jsonArray) {
         
         // 既然軌道 2 都沒了，軌道 3 的按鈕當然也要藏起來
         if (btn3) btn3.style.display = 'none';
-
+        if (btn4) btn4.style.display = 'none';    // 隱藏「新增軌道4」按鈕
         // 雖然隱藏了，但建議把內容清空，以免下次打開還有舊資料
         if (asset_canvas2) asset_canvas2.clear();
     }
@@ -2416,6 +2497,7 @@ function importProjectFromJson(jsonArray) {
         // 開啟模式
         if (t3c) t3c.style.display = 'block';     // 顯示畫布容器
         if (btn3) btn3.style.display = 'none';    // 隱藏「新增軌道3」按鈕 (因為已經開了)
+        if (btn4) btn4.style.display = 'block';    
 
         if (!asset_canvas3) {
             console.log("自動開啟軌道 3...");
@@ -2434,8 +2516,39 @@ function importProjectFromJson(jsonArray) {
         if (btn3) {
             btn3.style.display = hasLayer2 ? 'block' : 'none';
         }
+        if (btn4) btn4.style.display = 'none';    // 隱藏「新增軌道4」按鈕
 
         if (asset_canvas3) asset_canvas3.clear();
+    }
+
+    // 自動處理 軌道 4 (有資料開，沒資料關)
+    const layer4Data = jsonArray[3];
+    const hasLayer4 = layer4Data && layer4Data.length > 0;
+
+    if (hasLayer4) {
+        // 開啟模式
+        if (t4c) t4c.style.display = 'block';     // 顯示畫布容器
+        if (btn4) btn4.style.display = 'none';    // 隱藏「新增軌道4」按鈕
+
+        if (!asset_canvas4) {
+            console.log("自動開啟軌道 3...");
+            initAsset4Fabric(); 
+        } else {
+            asset_canvas4.clear();
+        }
+    } else {
+        // 關閉模式
+        // 匯入的檔沒有軌道 4，把介面收起來
+        if (t4c) t4c.style.display = 'none';      // 隱藏畫布容器
+        
+        // 這裡要判斷按鈕顯示狀態：
+        // 如果軌道 3 是開的 (hasLayer3 為 true)，那「新增軌道 4」按鈕應該要顯示出來讓使用者按
+        // 如果軌道 3 也是關的，那這個按鈕就繼續隱藏
+        if (btn4) {
+            btn4.style.display = hasLayer3 ? 'block' : 'none';
+        }
+
+        if (asset_canvas4) asset_canvas4.clear();
     }
 
     // 定義單個軌道的還原函式
@@ -2488,6 +2601,7 @@ function importProjectFromJson(jsonArray) {
     if (jsonArray[0]) restoreTrack(jsonArray[0], asset_canvas1, 1);
     if (jsonArray[1]) restoreTrack(jsonArray[1], asset_canvas2, 2);
     if (jsonArray[2]) restoreTrack(jsonArray[2], asset_canvas3, 3);
+    if (jsonArray[3]) restoreTrack(jsonArray[3], asset_canvas4, 4);
     console.log(`[匯入成功] 已還原軌道資料`);
     
 }
@@ -2690,6 +2804,8 @@ const btnAddTrack2 = document.getElementById('btnAddTrack2');
 const track2Container = document.getElementById('track2Container');
 const btnAddTrack3 = document.getElementById('btnAddTrack3');
 const track3Container = document.getElementById('track3Container');
+const btnAddTrack4 = document.getElementById('btnAddTrack4');
+const track4Container = document.getElementById('track4Container');
 
 if (btnAddTrack2 && track2Container) {
     btnAddTrack2.addEventListener('click', () => {
@@ -2715,11 +2831,25 @@ if (btnAddTrack3 && track3Container) {
     btnAddTrack3.addEventListener('click', () => {
         track3Container.style.display = 'block';
         btnAddTrack3.style.display = 'none';
-
+        // 當軌道 3 開啟後，顯示「新增軌道 4」按鈕
+        if (btnAddTrack4) btnAddTrack4.style.display = 'block';
         if (!asset_canvas3) {
             setTimeout(() => {
                 initAsset3Fabric();
                 console.log("軌道 3 已啟用");
+            }, 0);
+        }
+    });
+}
+// 新增軌道 4 的點擊事件
+if (btnAddTrack4 && track4Container) {
+    btnAddTrack4.addEventListener('click', () => {
+        track4Container.style.display = 'block';
+        btnAddTrack4.style.display = 'none';
+        if (!asset_canvas4) {
+            setTimeout(() => {
+                initAsset4Fabric();
+                console.log("軌道 4 已啟用");
             }, 0);
         }
     });
