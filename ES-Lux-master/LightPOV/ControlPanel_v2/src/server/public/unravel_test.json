@@ -1,0 +1,106 @@
+[
+  [
+    {
+      "mode": "MODES_PLAIN",
+      "start_time": 9384,
+      "duration": 7143,
+      "XH": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 156,
+        "p2": 0
+      },
+      "XS": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 255,
+        "p2": 0
+      },
+      "XV": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 128,
+        "p2": 0
+      },
+      "YH": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 156,
+        "p2": 0
+      },
+      "YS": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 255,
+        "p2": 0
+      },
+      "YV": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 128,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0
+    },
+    {
+      "mode": "MODES_PLAIN",
+      "start_time": 16501,
+      "duration": 7143,
+      "XH": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 149,
+        "p2": 0
+      },
+      "XS": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 255,
+        "p2": 0
+      },
+      "XV": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 128,
+        "p2": 0
+      },
+      "YH": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 149,
+        "p2": 0
+      },
+      "YS": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 255,
+        "p2": 0
+      },
+      "YV": {
+        "func": 1,
+        "range": 0,
+        "lower": 0,
+        "p1": 128,
+        "p2": 0
+      },
+      "p1": 0,
+      "p2": 0,
+      "p3": 0,
+      "p4": 0
+    }
+  ]
+]

@@ -57,6 +57,11 @@ const EFFECT_CONFIG = {
   "火焰": { extras: ["space"] },
   "鐮刀": { extras: ["position_fix", "length", "curvature"] },
   "扇形": { extras: ["bladeCount", "length", "curvature"] },
+  "Love":  { extras: ["reverse", "space"] },
+  "ES":  { extras: ["reverse", "space"] },
+  "工科":  { extras: ["reverse", "space"] },
+  "ESXOPT":  { extras: ["reverse", "space"] },
+  "齒輪": { extras: ["space"] }
 };
 
 const MODE_EXTRAS = {
@@ -67,7 +72,12 @@ const MODE_EXTRAS = {
   "MODES_FAN":        ["bladeCount", "length", "curvature"],
   "MODES_BOXES":      ["boxsize", "space"],
   "MODES_CMAP_DNA":   ["reverse", "space"],
-  "MODES_CMAP_FIRE":  ["space"]
+  "MODES_CMAP_FIRE":  ["space"],
+  "MODES_CMAP_LOVE":   ["reverse", "space"],
+  "MODES_MAP_ES":   ["reverse", "space"],
+  "MODES_MAP_ES_ZH":   ["reverse", "space"],
+  "MODES_MAP_ESXOPT":   ["reverse", "space"],
+  "MODES_CMAP_GEAR":  ["space"]
 };
 
 const assetItems = document.querySelectorAll('.Asset_item');
@@ -368,6 +378,11 @@ const MODE_MAP = {
   "方塊": "MODES_BOXES",
   "DNA":  "MODES_CMAP_DNA",
   "火焰": "MODES_CMAP_FIRE",
+  "Love": "MODES_CMAP_LOVE",
+  "齒輪": "MODES_CMAP_GEAR",
+  "ES": "MODES_MAP_ES",
+  "工科": "MODES_MAP_ES_ZH",
+  "ESXOPT": "MODES_MAP_ESXOPT",
 };
 
 const FUNC_CODE = {
@@ -580,48 +595,6 @@ function startServerTimeSync() {
         }
     }, 50); 
 }
-
-const importBtn = document.getElementById('btn_import_json');
-const importInput = document.getElementById('import_file_input');
-
-if (importBtn && importInput) {
-    // 點擊按鈕時，觸發隱藏的 input 點擊事件
-    /*importBtn.addEventListener('click', () => {
-        importInput.value = ''; // 清空 value，確保選同一個檔案也能觸發 change
-        importInput.click();
-    });*/
-
-    // 當使用者選好檔案後
-    importInput.addEventListener('change', (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        // 如果您是在本地環境執行 Server 且檔案都在專案資料夾內，傳送檔名即可
-        const fileName = file.name; 
-
-        console.log("準備切換設定檔為:", fileName);
-
-        // 發送請求給 Server 切換檔案
-        fetch('/update_file', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                file: fileName
-            })
-        })
-        .then(async (res) => {
-            if (res.ok) {
-                console.log("Server 成功切換設定檔！");
-                alert(`成功載入設定檔：${fileName}`);
-            } else {
-                const errMsg = await res.text();
-                console.error("切換失敗:", errMsg);
-                alert("匯入失敗，請確認 Server 找得到該檔案。\n錯誤訊息: " + errMsg);
-            }
-        })
-    });
-}
-
 
 // 頁面載入後自動啟動同步
 document.addEventListener('DOMContentLoaded', () => {
@@ -2430,6 +2403,7 @@ function generateProjectJson() {
 }
 
 // 綁定按鈕事件
+let currentJsonName = null;
 const btnExport = document.getElementById('btn_export_json');
 
 if (btnExport) {
@@ -2457,6 +2431,10 @@ if (btnExport) {
                 await writable.close();
                 
                 console.log(`[匯出成功] 檔案已儲存`);
+
+                const savedName = handle.name; // handle 會包含使用者實際取的檔名
+                await syncFileToServer(savedName);
+
                 return; // 成功後直接結束
             } catch (err) {
                 // 如果使用者按「取消」就不做任何事
@@ -2483,6 +2461,8 @@ if (btnExport) {
         URL.revokeObjectURL(url);
         
         console.log(`[匯出成功] 下載至預設資料夾`);
+
+        await syncFileToServer(fullFileName);
     });
 }
 // JSON 匯入功能 (Import from JSON)
@@ -2826,6 +2806,8 @@ if (btnImport && fileInputImport) {
         const file = e.target.files[0];
         if (!file) return;
 
+        const fileName = file.name;
+
         const reader = new FileReader();
         reader.onload = (evt) => {
             try {
@@ -2845,7 +2827,8 @@ if (btnImport && fileInputImport) {
                         finalData = rawData;
                         importProjectFromJson([rawData, []]);
                     }
-
+                    
+                    syncFileToServer(fileName);
                 } else {
                     // 如果根本不是陣列 (例如是單純的 Object)
                     alert("匯入失敗：JSON 格式不符 (根節點必須是 Array)");
@@ -2860,6 +2843,31 @@ if (btnImport && fileInputImport) {
         reader.readAsText(file);
     });
 }
+
+async function syncFileToServer(fileName) {
+    console.log(`準備通知 Server 切換為新匯出的檔案: ${fileName}`);
+
+    try {
+        const res = await fetch('/update_file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: fileName })
+        });
+
+        if (res.ok) {
+            console.log("Server 同步成功！");
+            if (typeof currentJsonName !== 'undefined') {
+                currentJsonName = fileName;
+            }
+        } else {
+            const text = await res.text();
+            console.warn("Server 收到檔名但回報錯誤 (可能是檔案尚未存入 Server 資料夾):", text);
+        }
+    } catch (err) {
+        console.error("無法傳送檔名給 Server:", err);
+    }
+}
+
 
 // 控制面板邏輯
 
@@ -2897,16 +2905,15 @@ function initControlPanelUI() {
     if (!controlListContainer) return;
     controlListContainer.innerHTML = '';
 
-    for (let i = 0; i < NUM_LUX_DEVICES; i++) {
+    for (let i = 1; i <= NUM_LUX_DEVICES; i++) {
         const row = document.createElement('div');
         row.className = 'control_row';
         row.innerHTML = `
             <div class="col-id">${i}</div>
             <div class="col-state"><span class="state_text disconnected" id="state_${i}">斷線</span></div>
-            <div class="col-time"><span class="time_text" id="time_${i}">--:--:--</span></div>
+            <div class="col-time"><span class="time_text" id="time_${i}">--</span></div>
             <div class="col-mode">
                 <select class="mode_select" onchange="updateLuxMode(${i}, this.value)">
-                    <option value="0">0</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
@@ -2924,49 +2931,95 @@ function initControlPanelUI() {
 
 // 3. 呼叫 Server API
 
-// 時間格式化工具
-function formatDuration(ms) {
-    if (ms < 0) return "00:00";
-    const totalSec = Math.floor(ms / 1000);
-    const h = Math.floor(totalSec / 3600);
-    const m = Math.floor((totalSec % 3600) / 60);
-    const s = totalSec % 60;
-    // 為了節省空間，若小時為0則不顯示
-    if (h > 0) return `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+const ENUM_MODES = [
+    "MODES_CLEAR",
+    "MODES_PLAIN",
+    "MODES_SQUARE",
+    "MODES_SICKLE",
+    "MODES_FAN",
+    "MODES_BOXES",
+    "MODES_SICKLE_ADV",
+    "MODES_FAN_ADV",
+    "MODES_MAP_ES",
+    "MODES_MAP_ES_ZH",
+    "MODES_CMAP_DNA",
+    "MODES_CMAP_FIRE",
+    "MODES_CMAP_BENSON",
+    "MODES_CMAP_YEN",
+    "MODES_CMAP_LOVE",
+    "MODES_CMAP_GEAR",
+    "MODES_MAP_ESXOPT"
+]
+
+function getModeName(index) {
+    const i = parseInt(index);
+    if (i >= 0 && i < ENUM_MODES.length) {
+        return ENUM_MODES[i].substring(6); 
+    }
+    return "Unknown";
 }
 
 // 輪詢狀態 (/get_stat)
 async function updateControlStatus() {
     const now = Date.now();
+
     for (let i = 0; i < NUM_LUX_DEVICES; i++) {
+
+        const stateEl = document.getElementById(`state_${i+1}`);
+        const statusEl = document.getElementById(`time_${i+1}`); 
+
+        if (!stateEl || !statusEl) continue;
+
         try {
-            // 對應 server.js: app.get("/get_stat", ...)
-            const res = await fetch(`/get_stat?id=${i}`);
-            if (!res.ok) continue;
+            const statRes = await fetch("/get_stat?id=" + i);
+            if (statRes.ok) {
+                const data = await statRes.text();
+                const lastTime = parseInt(data);
 
-            const lastSeenStr = await res.text();
-            const lastSeenTime = parseInt(lastSeenStr); 
-
-            const stateEl = document.getElementById(`state_${i}`);
-            const timeEl = document.getElementById(`time_${i}`);
-
-            // 判斷連線 (例如 5秒內有更新算連線)
-            const diff = now - lastSeenTime;
-            const isConnected = (lastSeenTime > 0 && diff < 5000);
-
-            if (isConnected) {
-                stateEl.textContent = "連線";
-                stateEl.className = "state_text connected";
-                timeEl.textContent = formatDuration(diff);
-            } else {
-                stateEl.textContent = "斷線";
-                stateEl.className = "state_text disconnected";
-                timeEl.textContent = "--:--";
+                if (now - lastTime < 1000) {
+                    stateEl.textContent = "已連線";
+                    stateEl.className = "state_text connected";
+                } else {
+                    stateEl.textContent = "斷線";
+                    stateEl.className = "state_text disconnected";
+                }
             }
         } catch (e) {
-            console.warn(e);
+            console.error(e);
         }
+        try {
+            const lightRes = await fetch("/get_light?id=" + i);
+            if (lightRes.ok) {
+                const data = await lightRes.text(); 
+                
+                const modeName = getModeName(data);
+                
+                statusEl.textContent = modeName;
+
+                if (modeName === "Unknown") {
+                    statusEl.style.color = "#555";
+                } else {
+                    statusEl.style.color = "#ffcc00"; // 亮黃色
+                    statusEl.style.fontWeight = "bold";
+                }
+            }
+        } catch (e) {
+            console.error(e);
+        }
+
+        /*
+        // 同步模式
+        const modeSelect = document.querySelector(`.control_row[data-id="${i}"] .mode_select`);
+        if (modeSelect) {
+            fetch(`/update_lux_mode?id=${i}&mode=${modeSelect.value}`).catch(()=>{});
+        }
+
+        // 同步 Reset (注意：這可能會讓 checkbox 一直被送出)
+        const rstCheck = document.querySelector(`.control_row[data-id="${i}"] .rst_check`);
+        if (rstCheck) {
+            fetch(`/update_lux_reset?id=${i}&clear=${rstCheck.checked}`).catch(()=>{});
+        }
+        */
     }
 }
 
