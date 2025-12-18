@@ -3226,3 +3226,16 @@ window.addEventListener('drop', () => {
     autoScrollVy = 0;
     cancelAnimationFrame(autoScrollRafId);
 });
+
+// 建立全域查找表，讓 EffectBlock 能找到目標軌道
+window.getCanvasInstanceById = function(domId) {
+    switch(domId) {
+        case 'assetCanvas1': return (typeof asset_canvas1 !== 'undefined') ? asset_canvas1 : null;
+        case 'assetCanvas2': return (typeof asset_canvas2 !== 'undefined') ? asset_canvas2 : null;
+        case 'assetCanvas3': return (typeof asset_canvas3 !== 'undefined') ? asset_canvas3 : null;
+        case 'assetCanvas4': return (typeof asset_canvas4 !== 'undefined') ? asset_canvas4 : null;
+        case 'assetCanvas5': return (typeof asset_canvas5 !== 'undefined') ? asset_canvas5 : null;
+        case 'assetCanvas6': return (typeof asset_canvas6 !== 'undefined') ? asset_canvas6 : null;
+        default: return null;
+    }
+};
