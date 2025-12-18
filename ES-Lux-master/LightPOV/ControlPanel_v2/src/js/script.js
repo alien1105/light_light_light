@@ -1280,13 +1280,8 @@ function resetAllStrokes(canvas) {
 //載入參數
 function loadAssetParams(e) {
   let activeObj = e.target;
-  if (!activeObj) {
-    if (asset_canvas1 && asset_canvas1.getActiveObject()) activeObj = asset_canvas1.getActiveObject();
-    else if (asset_canvas2 && asset_canvas2.getActiveObject()) activeObj = asset_canvas2.getActiveObject();
-    else if (asset_canvas3 && asset_canvas3.getActiveObject()) activeObj = asset_canvas3.getActiveObject();
-    else if (asset_canvas4 && asset_canvas4.getActiveObject()) activeObj = asset_canvas4.getActiveObject();
-    else if (asset_canvas5 && asset_canvas5.getActiveObject()) activeObj = asset_canvas5.getActiveObject();
-    else if (asset_canvas6 && asset_canvas6.getActiveObject()) activeObj = asset_canvas6.getActiveObject();
+  if (!activeObj && e.selected && e.selected.length > 0) {
+      activeObj = e.selected[0];
   }
   if (!activeObj || !activeObj.logicBlock){
   return;
@@ -1296,20 +1291,19 @@ function loadAssetParams(e) {
   console.log(`[選取 ID:${block.id}] 目前資料庫內容:`, JSON.parse(JSON.stringify(globalEffectData)))
   // 印出整個物件結構，展開來檢查
   console.dir(block);
-  // 選取當前畫布時，取消其他畫布
-  if (activeObj.canvas !== asset_canvas1 && asset_canvas1) asset_canvas1.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas2 && asset_canvas2) asset_canvas2.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas3 && asset_canvas3) asset_canvas3.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas4 && asset_canvas4) asset_canvas4.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas5 && asset_canvas5) asset_canvas5.discardActiveObject();
-  if (activeObj.canvas !== asset_canvas6 && asset_canvas6) asset_canvas6.discardActiveObject();  
-  // 先重置所有顏色，再將當前物件設為藍色
-  resetAllStrokes(asset_canvas1);
-  resetAllStrokes(asset_canvas2);
-  resetAllStrokes(asset_canvas3);
-  resetAllStrokes(asset_canvas4);
-  resetAllStrokes(asset_canvas5);
-  resetAllStrokes(asset_canvas6);
+  const allCanvases = [asset_canvas1, asset_canvas2, asset_canvas3, asset_canvas4, asset_canvas5, asset_canvas6];
+  
+  allCanvases.forEach(cvs => {
+      // 如果這個畫布存在，且不是目前操作的畫布，就取消選取
+      if (cvs && cvs !== activeObj.canvas) {
+          cvs.discardActiveObject();
+          cvs.requestRenderAll(); 
+      }
+  });
+  // 重置所有顏色
+  allCanvases.forEach(cvs => resetAllStrokes(cvs));
+
+  // 將當前物件設為藍色
   if (activeObj.item(0)) {
     activeObj.item(0).set({
     stroke: '#00aaff',
@@ -1476,9 +1470,8 @@ function initAsset1Fabric() {
              if (paramMain) paramMain.classList.add('hidden');
          }
      }, 10);
-     asset_canvas1.requestRenderAll();
   });
-  
+  bindFocusEvent(asset_canvas1);
   asset_canvas1.requestRenderAll();
 }
 
@@ -1535,6 +1528,7 @@ function initAsset2Fabric() {
          }
     }, 10);
   });
+  bindFocusEvent(asset_canvas2);
   asset_canvas2.requestRenderAll();
 }
 
@@ -1584,7 +1578,7 @@ function initAsset3Fabric() {
       }
     }, 20);
   });
-     
+  bindFocusEvent(asset_canvas3);   
   asset_canvas3.requestRenderAll();
 }
 
@@ -1634,7 +1628,7 @@ function initAsset4Fabric() {
       }
     }, 20);
   });
-     
+  bindFocusEvent(asset_canvas4);   
   asset_canvas4.requestRenderAll();
 }
 function initAsset5Fabric() {
@@ -1683,7 +1677,7 @@ function initAsset5Fabric() {
       }
     }, 20);
   });
-     
+  bindFocusEvent(asset_canvas5);   
   asset_canvas5.requestRenderAll();
 }
 function initAsset6Fabric() {
@@ -1697,8 +1691,8 @@ function initAsset6Fabric() {
     renderOnAddRemove: true
   });
   
-  asset_canvas5.setWidth(assetCanvas5El.clientWidth);
-  asset_canvas5.setHeight(assetCanvas5El.clientHeight);
+  asset_canvas6.setWidth(assetCanvas5El.clientWidth);
+  asset_canvas6.setHeight(assetCanvas5El.clientHeight);
 
   // 拖曳放下 (Drop)
   const canvasContainer = asset_canvas6.wrapperEl;
@@ -1712,10 +1706,10 @@ function initAsset6Fabric() {
   });
 
   // --- 事件監聽 ---
-  asset_canvas5.on('selection:created', loadAssetParams);
-  asset_canvas5.on('selection:updated', loadAssetParams);
+  asset_canvas6.on('selection:created', loadAssetParams);
+  asset_canvas6.on('selection:updated', loadAssetParams);
   
-  asset_canvas5.on('selection:cleared', () => {
+  asset_canvas6.on('selection:cleared', () => {
     resetAllStrokes(asset_canvas5);
     // 檢查所有畫布
     const c1 = asset_canvas1 && asset_canvas1.getActiveObject();
@@ -1732,7 +1726,7 @@ function initAsset6Fabric() {
       }
     }, 20);
   });
-     
+  bindFocusEvent(asset_canvas6);   
   asset_canvas6.requestRenderAll();
 }
 // 根據時間軸的 Offset 和 Zoom 更新素材位置
@@ -1834,7 +1828,14 @@ function createAssetOnCanvas(assetName, x, y, targetCanvas) {
 
     console.log(`已建立 Block Class ID: ${newBlock.id}`);
 }
-//delete功能
+// 用來隨時記錄滑鼠在螢幕上的位置
+let globalMousePos = { x: 0, y: 0 };
+
+// 監聽滑鼠移動，隨時更新座標
+window.addEventListener('mousemove', (e) => {
+    globalMousePos.x = e.clientX;
+    globalMousePos.y = e.clientY;
+});
 window.addEventListener('keydown', (e) => {
   // 檢查按鍵是否為 Delete
   if (e.key === 'Delete') {    
@@ -1866,9 +1867,101 @@ window.addEventListener('keydown', (e) => {
           canvas.requestRenderAll();
         }
       });
-
-
   }
+  // 檢查是否按下了 Ctrl (Mac 是 Command)
+    const isCmdOrCtrl = e.ctrlKey || e.metaKey;
+    // 複製 (Ctrl + C)
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'c') {
+        if (!lastFocusedCanvas) return;
+
+        // 取得目前選取的物件
+        const activeObj = lastFocusedCanvas.getActiveObject();
+
+        // 確保選到的是效果方塊
+        if (activeObj && activeObj.logicBlock) {
+            const sourceBlock = activeObj.logicBlock;
+
+            // 複製資料 (使用 JSON 方法進行深拷貝，切斷引用關係)
+            appClipboard = {
+                name: sourceBlock.name,
+                duration: sourceBlock.duration,
+                // 複製全域參數資料
+                params: JSON.parse(JSON.stringify(sourceBlock.params || {}))
+            };
+            
+            console.log('已複製方塊:', appClipboard.name);
+        }
+    }
+
+    // 貼上 (Ctrl + V)
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'v') {
+        // 檢查剪貼簿有沒有東西
+        if (!appClipboard) return;
+        
+        let targetCanvas = null;
+        let pasteX = 0;
+        
+        // 檢查滑鼠現在是不是懸停在某個軌道上
+        const canvasIds = ['assetCanvas1', 'assetCanvas2', 'assetCanvas3', 'assetCanvas4', 'assetCanvas5', 'assetCanvas6'];
+        
+        for (let id of canvasIds) {
+            const el = document.getElementById(id);
+            if (!el) continue;
+            
+            const rect = el.getBoundingClientRect();
+            
+            // 碰撞檢測：滑鼠是否在這個軌道範圍內
+            if (globalMousePos.x >= rect.left && globalMousePos.x <= rect.right &&
+                globalMousePos.y >= rect.top && globalMousePos.y <= rect.bottom) {
+                
+                // 找到滑鼠指著的軌道就使用之前寫的 helper 取得畫布實例
+                targetCanvas = window.getCanvasInstanceById ? window.getCanvasInstanceById(id) : null;
+                
+                if (targetCanvas) {
+                    // 計算相對座標 
+                    pasteX = globalMousePos.x - rect.left;
+                }
+                break; // 找到就停止迴圈
+            }
+        }
+
+        // 如果滑鼠沒指著任何軌道，就貼在最後點選的軌道
+        if (!targetCanvas) {
+            targetCanvas = lastFocusedCanvas;
+            // 如果連最後焦點都沒有，就貼在軌道 1 
+            if (!targetCanvas && typeof asset_canvas1 !== 'undefined') targetCanvas = asset_canvas1;
+            
+            // 位置設為目前的播放頭位置 (Timeline Offset)
+            if (typeof window.timelineOffset === 'number') {
+                // 將時間轉為 X 座標
+                pasteX = 0; 
+            }
+        }
+
+        if (!targetCanvas) return;
+
+        // 產生新 ID 與方塊
+        const newId = generateUniqueId();
+        const newBlock = new EffectBlock(newId, appClipboard.name);
+        
+        newBlock.duration = appClipboard.duration;
+        newBlock.params = appClipboard.params;
+
+        // 渲染
+        const finalX = Math.max(0, pasteX); 
+        const centerY = targetCanvas.getHeight() / 2;
+
+        newBlock.render(targetCanvas, finalX, centerY);
+
+        // 視覺選取
+        if (newBlock.fabricGroup) {
+            targetCanvas.setActiveObject(newBlock.fabricGroup);
+            newBlock.fabricGroup.fire('scaling');
+        }
+        
+        targetCanvas.requestRenderAll();
+        console.log(`已貼上方塊 ${newId} 於 X:${Math.floor(finalX)}`);
+    }
 });
 // Initialization
 function initAll() {
@@ -3239,3 +3332,23 @@ window.getCanvasInstanceById = function(domId) {
         default: return null;
     }
 };
+
+//  用來暫存複製的資料 (剪貼簿)
+let appClipboard = null;
+
+// 記錄最後點擊的畫布 (預設為軌道1)
+let lastFocusedCanvas = null;
+
+// 簡單的 ID 產生器 (產生隨機字串)
+function generateUniqueId() {
+    return 'effect_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+}
+
+// 幫所有存在的軌道畫布綁定「焦點偵測」
+function bindFocusEvent(canvasInstance) {
+    if (!canvasInstance) return;
+    
+    canvasInstance.on('mouse:down', () => {
+        lastFocusedCanvas = canvasInstance;  
+    });
+}
