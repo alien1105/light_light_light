@@ -21,6 +21,53 @@ let EffectMapData = fs.readFileSync(path.join(__dirname, 'public', SONG));
 let EffectMap = JSON.parse(EffectMapData);
 
 //setInterval(state_update, 1000)
+// function stringify(m) {
+//     if (!m) return "ERROR!!"; // 防呆
+
+//     // 1. 基本參數 (Mode, Start, Duration)
+//     let s = "M" + (m.mode || 0) + 
+//             "S" + (m.start_time || 0) + 
+//             "D" + (m.duration || 0);
+
+//     // 2. 顏色參數打包 (XH, XS, XV, YH, YS, YV)
+//     // 對應 C++: upper = (func<<16 | range<<8 | lower), lower = (p1<<8 | p2)
+//     const packColor = (obj) => {
+//         if (!obj) return "0,0";
+//         let upper = ((obj.func || 0) << 16) | ((obj.range || 0) << 8) | (obj.lower || 0);
+//         let lower_val = ((obj.p1 || 0) << 8) | (obj.p2 || 0);
+//         return upper + "," + lower_val;
+//     };
+
+//     s += "X" + packColor(m.XH);
+//     s += "Y" + packColor(m.XS);
+//     s += "Z" + packColor(m.XV);
+//     s += "U" + packColor(m.YH);
+//     s += "V" + packColor(m.YS);
+//     s += "W" + packColor(m.YV);
+
+//     // 3. 全域參數打包 (Param)
+//     // 對應 C++: upper = (p0<<8 | p1), lower = (p2<<8 | p3)
+//     let p0 = m.p1 || 0; // JSON 裡的 key 可能是 p1, p2, p3, p4
+//     let p1 = m.p2 || 0;
+//     let p2 = m.p3 || 0;
+//     let p3 = m.p4 || 0;
+    
+//     // 如果您的 JSON 結構是用 param 陣列，請改用 m.param[0]...
+//     if (m.param && Array.isArray(m.param)) {
+//         p0 = m.param[0] || 0;
+//         p1 = m.param[1] || 0;
+//         p2 = m.param[2] || 0;
+//         p3 = m.param[3] || 0;
+//     }
+
+//     let p_upper = (p0 << 8) | p1;
+//     let p_lower = (p2 << 8) | p3;
+//     s += "P" + p_upper + "," + p_lower;
+
+//     // 結尾分號
+//     return s + ";";
+// }
+
 
 function createEnum(name_list) {
     enum_dict = {};
