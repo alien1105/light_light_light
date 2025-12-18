@@ -3153,3 +3153,76 @@ if (btnAddTrack6 && track6Container) {
         }
     });
 }
+
+// 全域拖曳自動捲動功能
+let isDraggingGlobal = false;
+let autoScrollVy = 0;       // 垂直捲動速度
+let autoScrollRafId = null; // AnimationFrame ID
+
+// 定義捲動迴圈
+function globalDragScrollLoop() {
+    if (!isDraggingGlobal) {
+        cancelAnimationFrame(autoScrollRafId);
+        return;
+    }
+
+    // 如果有速度，就捲動視窗
+    if (autoScrollVy !== 0) {
+        window.scrollBy(0, autoScrollVy);
+    }
+
+    autoScrollRafId = requestAnimationFrame(globalDragScrollLoop);
+}
+
+// 監聽：當素材開始被拖曳時
+document.addEventListener('dragstart', (e) => {
+    // 確認是素材被拖曳
+    if (e.target.classList && e.target.classList.contains('Asset_item')) {
+        isDraggingGlobal = true;
+        autoScrollVy = 0;
+        globalDragScrollLoop(); // 啟動迴圈
+    }
+});
+
+// 監聽：拖曳結束時 (無論成功或取消)
+document.addEventListener('dragend', () => {
+    isDraggingGlobal = false;
+    autoScrollVy = 0;
+    cancelAnimationFrame(autoScrollRafId);
+});
+
+// 監聽：拖曳過程中計算滑鼠位置
+window.addEventListener('dragover', (e) => {
+    if (!isDraggingGlobal) return;
+    
+    // 必須阻止預設行為，否則某些瀏覽器不會觸發連續座標更新
+    e.preventDefault();
+
+    const y = e.clientY;           // 滑鼠在視窗內的 Y 座標
+    const h = window.innerHeight;  // 視窗高度
+    const threshold = 100;         // 距離邊緣多少像素開始捲動 (100px)
+    const maxSpeed = 15;           // 最大捲動速度
+
+    // 判斷是否接近底部
+    if (y > h - threshold) {
+        // 越接近邊緣，速度越快
+        const intensity = (y - (h - threshold)) / threshold;
+        autoScrollVy = maxSpeed * intensity;
+    } 
+    // 判斷是否接近頂部
+    else if (y < threshold) {
+        const intensity = (threshold - y) / threshold;
+        autoScrollVy = -maxSpeed * intensity;
+    } 
+    // 在中間區域
+    else {
+        autoScrollVy = 0;
+    }
+});
+
+// 監聽：Drop 事件 (作為雙重保險，停止捲動)
+window.addEventListener('drop', () => {
+    isDraggingGlobal = false;
+    autoScrollVy = 0;
+    cancelAnimationFrame(autoScrollRafId);
+});
