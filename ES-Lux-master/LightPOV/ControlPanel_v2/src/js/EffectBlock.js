@@ -1,5 +1,3 @@
-// 檔案名稱：EffectBlock.js
-
 class EffectBlock {
     constructor(id, name) {
         this.id = id;
@@ -86,9 +84,67 @@ class EffectBlock {
     _bindEvents(canvas) {
         const group = this.fabricGroup;
         const textObj = group.item(1);
+        // 用來控制自動滾動的狀態變數
+        let scrollDirection = 0; // 0:停止, 1:往右, -1:往左
+        let isScrolling = false; // 防止重複啟動迴圈
+        // 定義自動捲動的迴圈函式
+        const startAutoScroll = () => {
+            if (isScrolling) return; // 如果已經在跑，就不要重複啟動
+            isScrolling = true;
+            
+            const scrollLoop = () => {
+                // 如果滑鼠移開或放開，就停止迴圈
+                if (scrollDirection === 0) {
+                    isScrolling = false;
+                    return; 
+                }
 
+                // 執行捲動：改變 timelineOffset
+                const scrollSpeedPx = 15; 
+                
+                if (scrollDirection === 1) {
+                    timelineOffset += scrollSpeedPx * secondsPerPixel;
+                } else if (scrollDirection === -1) {
+                    timelineOffset -= scrollSpeedPx * secondsPerPixel;
+                    if (timelineOffset < 0) timelineOffset = 0;
+                }
+
+               // 畫面更新
+                    drawTimeline();
+                    updateAssetPositions();                   
+
+                // 更新目前拖曳方塊的 startTime
+                this.startTime = timelineOffset + (group.left * secondsPerPixel);
+
+                // 即時寫入全域資料庫
+                if (window.globalEffectData[this.id]) {
+                    window.globalEffectData[this.id].startTime = this.startTime;
+                }
+
+                setTimeout(scrollLoop, 75);
+            };
+            
+            // 啟動迴圈
+            scrollLoop();
+        };
         // 移動時
-        group.on('moving', () => {
+        group.on('moving', (e) => {
+            // 自動捲動
+            const pointer = canvas.getPointer(e.e); // 取得滑鼠在畫布上的座標
+            const w = canvas.getWidth();
+            const threshold = 50; // 距離邊緣多少像素開始捲動
+
+            // 判斷是否需要捲動
+            if (pointer.x > w - threshold) {
+                scrollDirection = 1; // 往右
+                startAutoScroll();   // 啟動迴圈
+            } else if (pointer.x < threshold) {
+                scrollDirection = -1; // 往左
+                startAutoScroll();
+            } else {
+                scrollDirection = 0; // 在中間區域，停止捲動
+            }
+
             const bounds = this._getSafeBoundaries(canvas);
             const currentWidth = group.getScaledWidth();
 
@@ -132,6 +188,16 @@ class EffectBlock {
                 window.globalEffectData[this.id].startTime = this.startTime;
                 window.globalEffectData[this.id].duration = this.duration;
             }
+        });
+
+        // 監聽放開事件 (這很重要！放開滑鼠時一定要停止捲動)
+        group.on('mouseup', () => {
+            scrollDirection = 0;
+        });
+        
+        // 額外保險：如果拖到一半滑鼠移出畫布或取消選取
+        group.on('deselected', () => {
+            scrollDirection = 0;
         });
     }
 

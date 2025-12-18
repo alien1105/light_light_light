@@ -738,7 +738,7 @@ function drawTimeline() {
   const canvas = timescale_canvas;
   const w = canvas.getWidth();
   const h = canvas.getHeight();
-
+  
   canvas.clear();
 
   // baseline
@@ -790,7 +790,7 @@ function drawTimeline() {
   updatePlayheadVisual();
   canvas.add(playhead);
   updateAssetPositions();
-  canvas.requestRenderAll();
+  canvas.renderAll();
 }
 
 // Create waveform image from peaks and add as Fabric image (clip)
@@ -1742,6 +1742,8 @@ function updateAssetPositions() {
   targetCanvas.forEach(canvas => {
     if (!canvas) return;
     canvas.getObjects().forEach(obj => {
+      // 如果是正在操作的物件，就跳過不更新它的位置
+      if (obj.isMoving) return;
       // 檢查有沒有 logicBlock 
       if (obj.logicBlock) {
         const block = obj.logicBlock;
@@ -2902,18 +2904,23 @@ document.querySelectorAll('.param_tab').forEach(tab => {
 
 // 2. 初始化列表 UI
 function initControlPanelUI() {
-    if (!controlListContainer) return;
-    controlListContainer.innerHTML = '';
+    const container = document.getElementById('control_list_container');
+    if (!container) return;
+    
+    container.innerHTML = '';
 
-    for (let i = 1; i <= NUM_LUX_DEVICES; i++) {
+    for (let i = 0; i < NUM_LUX_DEVICES; i++) {
         const row = document.createElement('div');
         row.className = 'control_row';
         row.innerHTML = `
-            <div class="col-id">${i}</div>
-            <div class="col-state"><span class="state_text disconnected" id="state_${i}">斷線</span></div>
-            <div class="col-time"><span class="time_text" id="time_${i}">--</span></div>
+            <div class="col-id">${i + 1}</div>
+            
+            <div class="col-state"><span class="state_text disconnected" id="state_${i + 1}">斷線</span></div>
+            <div class="col-time"><span class="time_text" id="time_${i + 1}">--</span></div>
+            
             <div class="col-mode">
                 <select class="mode_select" onchange="updateLuxMode(${i}, this.value)">
+                    <option value="0">0</option>
                     <option value="1">1</option>
                     <option value="2">2</option>
                     <option value="3">3</option>
@@ -2921,13 +2928,15 @@ function initControlPanelUI() {
                     <option value="5">5</option>
                 </select>
             </div>
+            
             <div class="col-rst">
                 <input type="checkbox" class="rst_check" onchange="triggerReset(${i}, this)">
             </div>
         `;
-        controlListContainer.appendChild(row);
+        container.appendChild(row);
     }
 }
+
 
 // 3. 呼叫 Server API
 
