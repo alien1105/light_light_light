@@ -2397,7 +2397,13 @@ function generateProjectJson() {
       // 讀取數值 (如果沒有該欄位則預設 0)
       const originalRange = block[`${prefix}_range`] || 0;
       const originalLower = block[`${prefix}_lower`] || 0;
-      const range = normalizeTo255(originalRange, 0, maxVal);
+      if (prefix.startsWith('Y')) {
+          // 如果是 Y 軸，直接儲存原始數值
+          range = Number(originalRange);
+      } else {
+          // 如果是 X 軸，維持原本的 0-255 正規化
+          range = normalizeTo255(originalRange, 0, maxVal);
+      }
       const lower = normalizeTo255(originalLower, 0, maxVal);
       let p1 = 0, p2 = 0;
 
@@ -2581,7 +2587,13 @@ function unpackHsvToParams(prefix, hsvData) {
     // 輔助函式：從 255 反推
     const f = (v255, max) => from255(v255, 0, max);
 
-    params[`${prefix}_range`] = f(hsvData.range, maxVal) || 0;
+    if (prefix.startsWith('Y')) {
+        // 如果是 Y 軸，直接使用 JSON 裡的數值，不經過轉換
+        params[`${prefix}_range`] = hsvData.range || 0;
+    } else {
+        // 如果是 X 軸，使用 f() 從 0-255 反推回原始區間
+        params[`${prefix}_range`] = f(hsvData.range, maxVal) || 0;
+    }
     params[`${prefix}_lower`] = f(hsvData.lower, maxVal) || 0;
     
     // 根據 Function 還原特定欄位
