@@ -115,7 +115,7 @@ CRGB inline ColorScheduler::getPixelColor(uint8_t y){
 }
 
 void ColorScheduler::getPixelColor(CRGB* pixels, uint32_t bitmap, CHSV replace){
-    for( uint8_t i=0; i<NUMPIXELS; i++){
+    for( uint8_t i=0; i<NUMPIXELS_DEFAULT; i++){
         if (bitmap & 1)
             pixels[i] = getPixelColor(i);
         else pixels[i] = replace;
@@ -124,13 +124,13 @@ void ColorScheduler::getPixelColor(CRGB* pixels, uint32_t bitmap, CHSV replace){
 }
 
 void ColorScheduler::getPixelColor(CRGB* pixels){
-    for( uint8_t i=0; i<NUMPIXELS; i++){
+    for( uint8_t i=0; i<NUMPIXELS_DEFAULT; i++){
         pixels[i] = getPixelColor(i);
     }
 }
 
 void ColorScheduler::getPixelColor(CRGB* pixels, const uint16_t* colormap){
-    for( uint8_t i=0; i<NUMPIXELS; i++){
+    for( uint8_t i=0; i<NUMPIXELS_DEFAULT; i++){
         pixels[i] = CHSV(
             colormap[i] >> 7 & 0xf8,
             colormap[i] >> 2 & 0xf8,
@@ -145,7 +145,7 @@ void ColorScheduler::getPixelColor(CRGB* pixels, const uint16_t* colormap){
 Effects::Effects():buffer(sizeof(Mode), QUEUE_SIZE, FIFO),
     sch(millis(), 0){
     effect_id = 0;
-    FastLED.addLeds<WS2812B, PIN_LED, GRB>(pixels, NUMPIXELS);
+    FastLED.addLeds<WS2812B, PIN_LED, GRB>(pixels, NUMPIXELS_DEFAULT);
 }
 
 int16_t Effects::checkBufferAvailable(){
@@ -351,7 +351,7 @@ void Effects::boxes(Mode* m){
         for (int b=1; b<boxsize; b++){
             uint32_t map = 0;
 
-            uint32_t unit = (((uint32_t)0x1<<b) - 1) << ((NUMPIXELS - b)/2);
+            uint32_t unit = (((uint32_t)0x1<<b) - 1) << ((NUMPIXELS_DEFAULT - b)/2);
             for (int j=0; j<boxsize/2; j++){
                 uint16_t idx = getIdx();
                 sch.updateHeading(idx);
@@ -378,8 +378,8 @@ void Effects::sickle(Mode* m){
         for (int b=1; b<width; b++){
             uint16_t idx = getIdx();
             sch.updateHeading(idx);
-            uint8_t led_idx = NUMPIXELS * b / width;
-            for (int l=(NUMPIXELS * (b-1) / width); l < NUMPIXELS * b / width; l++)
+            uint8_t led_idx = NUMPIXELS_DEFAULT * b / width;
+            for (int l=(NUMPIXELS_DEFAULT * (b-1) / width); l < NUMPIXELS_DEFAULT * b / width; l++)
                 pixels[l] = sch.getPixelColor(l);
             showLED();
         }
@@ -402,11 +402,11 @@ void Effects::fan(Mode* m){
             sch.updateHeading(idx);
 
             FastLED.clear();
-            uint8_t led_idx = (NUMPIXELS * w / width) % density;
-            for (int d=0; d<=NUMPIXELS/density; d++){
+            uint8_t led_idx = (NUMPIXELS_DEFAULT * w / width) % density;
+            for (int d=0; d<=NUMPIXELS_DEFAULT/density; d++){
                 for (int t=0; t<thickness; t++){
                     uint16_t lidx = led_idx + d * density + t;
-                    if (lidx < NUMPIXELS)
+                    if (lidx < NUMPIXELS_DEFAULT)
                     pixels[lidx] = sch.getPixelColor(idx);
                 }
             }
@@ -453,7 +453,7 @@ void Effects::bitmapEsZh(Mode* m){
 /* 
  * p4: space
  */
-void Effects::colormap(Mode* m, const uint16_t (*map)[NUMPIXELS], int length){
+void Effects::colormap(Mode* m, const uint16_t (*map)[NUMPIXELS_DEFAULT], int length){
     uint8_t space = m->param[3];
     setEffectStart(m);
     while( checkDuration(m) ){
