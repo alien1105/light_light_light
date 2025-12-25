@@ -60,6 +60,8 @@ const EFFECT_CONFIG = {
   "Love":  { extras: ["reverse", "space"] },
   "ES":  { extras: ["reverse", "space"] },
   "工科":  { extras: ["reverse", "space"] },
+  "PT":  { extras: ["reverse", "space"] },
+  "OT":  { extras: ["reverse", "space"] },
   "ESXOPT":  { extras: ["reverse", "space"] },
   "齒輪": { extras: ["space"] }
 };
@@ -77,6 +79,8 @@ const MODE_EXTRAS = {
   "MODES_MAP_ES":   ["reverse", "space"],
   "MODES_MAP_ES_ZH":   ["reverse", "space"],
   "MODES_MAP_ESXOPT":   ["reverse", "space"],
+  "MODES_CMAP_BENSON":   ["reverse", "space"],
+  "MODES_CMAP_YEN":   ["reverse", "space"],
   "MODES_CMAP_GEAR":  ["space"]
 };
 
@@ -383,6 +387,8 @@ const MODE_MAP = {
   "ES": "MODES_MAP_ES",
   "工科": "MODES_MAP_ES_ZH",
   "ESXOPT": "MODES_MAP_ESXOPT",
+  "OT": "MODES_CMAP_BENSON",
+  "PT": "MODES_CMAP_YEN"
 };
 
 const FUNC_CODE = {
@@ -3050,7 +3056,9 @@ const ENUM_MODES = [
     "MODES_CMAP_YEN",
     "MODES_CMAP_LOVE",
     "MODES_CMAP_GEAR",
-    "MODES_MAP_ESXOPT"
+    "MODES_MAP_ESXOPT",
+    "MODES_CMAP_BENSON",
+    "MODES_CMAP_YEN"
 ]
 
 function getModeName(index) {
