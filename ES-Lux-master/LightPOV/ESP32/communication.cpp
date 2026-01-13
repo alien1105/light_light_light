@@ -1,17 +1,20 @@
 #include "communication.h"
+#include "ConfigManager.h"
 
 extern TaskHandle_t LED_UPDATE;
 extern TaskHandle_t WIFI_HANDLE;
 
 HTTPClient http;
 
-Communication::Communication(){
+Communication::Communication() : server(80), isAPMode(false) {
     
 }
 
 void Communication::init(){
     connect();
-    OTA();
+    if (!isAPMode) {
+        OTA();
+    }
 }
 
 void Communication::OTA()
@@ -65,37 +68,110 @@ void Communication::OTA()
 }
 
 void Communication::connect(){
+    // Try to connect to stored WiFi networks
+    WiFi.mode(WIFI_STA);
     int n = WiFi.scanNetworks();
+    bool connected = false;
+    
     for (int i = 0; i < n; ++i){
-        String ssid = WiFi.SSID(i);
-        if (ssid == WIFI_SSID1 || ssid == WIFI_SSID2 || ssid == WIFI_SSID3){
-            String pass = (ssid == WIFI_SSID1) ? WIFI_PASS1 : (ssid == WIFI_SSID2) ? WIFI_PASS2 : WIFI_PASS3;
-            WiFi.begin(ssid.c_str(), pass.c_str());
-            Serial.println();
-            Serial.print("Connecting to ");
-            Serial.println(ssid);
-            break;
+        String scan_ssid = WiFi.SSID(i);
+        for(int j=0; j<3; j++) {
+            if (scan_ssid == String(configManager.data.ssid[j])) {
+                Serial.println("Found known network: " + scan_ssid);
+                WiFi.begin(scan_ssid.c_str(), configManager.data.password[j]);
+                
+                int retry = 0;
+                while (WiFi.status() != WL_CONNECTED && retry < 20) {
+                    delay(500);
+                    Serial.print(".");
+                    retry++;
+                }
+                
+                if (WiFi.status() == WL_CONNECTED) {
+                    Serial.println("\nConnected to " + scan_ssid);
+                    connected = true;
+                    goto done_connecting;
+                }
+            }
         }
     }
 
-    Serial.print("Waiting for connection");
-    int connection_times = 0;
-    while (WiFi.status() != WL_CONNECTED){
-        vTaskDelay(pdMS_TO_TICKS(500));
-        Serial.print(".");
-        connection_times++;
-        if (connection_times >= WIFI_CONNECT_RETRY){
-            Serial.println();
-            Serial.println("Connection Failed! Rebooting...");
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            ESP.restart();
-        }
+done_connecting:
+    if (WiFi.status() == WL_CONNECTED){
+        Serial.println("");
+        Serial.print("IP address: ");
+        Serial.println(WiFi.localIP());
+        Serial.println(WiFi.gatewayIP());
+    } else {
+        Serial.println("\nWiFi connection failed. Starting AP mode...");
+        startAP();
+    }
+}
+
+void Communication::startAP() {
+    isAPMode = true;
+    WiFi.mode(WIFI_AP);
+    WiFi.softAP("LightPOV_Config", "12345678");
+    Serial.print("AP Started. IP: ");
+    Serial.println(WiFi.softAPIP());
+
+    server.on("/", HTTP_GET, std::bind(&Communication::handleRoot, this));
+    server.on("/save", HTTP_POST, std::bind(&Communication::handleSave, this));
+    server.begin();
+    Serial.println("Config Server started");
+}
+
+void Communication::handleClient() {
+    if (isAPMode) {
+        server.handleClient();
+    }
+}
+
+void Communication::handleRoot() {
+    String html = "<html><head><title>LightPOV Config</title></head><body>";
+    html += "<h1>LightPOV Configuration</h1>";
+    html += "<form action='/save' method='POST'>";
+    
+    html += "<h3>WiFi Settings</h3>";
+    for(int i=0; i<3; i++) {
+        html += "SSID " + String(i+1) + ": <input type='text' name='ssid" + String(i) + "' value='" + String(configManager.data.ssid[i]) + "'><br>";
+        html += "Pass " + String(i+1) + ": <input type='text' name='pass" + String(i) + "' value='" + String(configManager.data.password[i]) + "'><br>";
     }
 
-    Serial.println("");
-    Serial.print("IP address: ");
-    Serial.println(WiFi.localIP());
-    Serial.println(WiFi.gatewayIP());
+    html += "<h3>Device Settings</h3>";
+    html += "LUX ID: <input type='number' name='lux_id' value='" + String(configManager.data.lux_id) + "'><br>";
+    html += "Request URL: <input type='text' name='req_url' value='" + String(configManager.data.request_url) + "'><br>";
+    html += "Time URL: <input type='text' name='time_url' value='" + String(configManager.data.time_check_url) + "'><br>";
+    
+    html += "<br><input type='submit' value='Save & Restart'>";
+    html += "</form></body></html>";
+    
+    server.send(200, "text/html", html);
+}
+
+void Communication::handleSave() {
+    if (server.hasArg("lux_id")) {
+        configManager.data.lux_id = server.arg("lux_id").toInt();
+        
+        for(int i=0; i<3; i++) {
+            String s = server.arg("ssid" + String(i));
+            String p = server.arg("pass" + String(i));
+            strncpy(configManager.data.ssid[i], s.c_str(), 32);
+            strncpy(configManager.data.password[i], p.c_str(), 64);
+        }
+        
+        strncpy(configManager.data.request_url, server.arg("req_url").c_str(), 64);
+        strncpy(configManager.data.time_check_url, server.arg("time_url").c_str(), 64);
+        
+        configManager.save();
+        
+        String html = "<html><body><h1>Saved!</h1><p>Restarting device...</p></body></html>";
+        server.send(200, "text/html", html);
+        delay(2000);
+        ESP.restart();
+    } else {
+        server.send(400, "text/plain", "Missing args");
+    }
 }
 
 void Communication::feed_color_param(ValueParam* p, String s){
@@ -126,18 +202,6 @@ int Communication::feed_data(Mode* m, String s){
             // Length of string must larger than 0
             String meta = s.substring(start, i);
 
-            /*
-            // If it failed to convert, it will return 0.
-            if (len == 0)       // Mode Type
-                (*m).mode = (MODES)meta.toInt();
-            else if (len == 1)  // Start time
-                (*m).start_time = meta.toInt();
-            else{               // Other parameter
-                (*m).param[len-2] = meta.toInt();
-                checksum += (*m).param[len-2];
-            }
-            len++;
-            */
             char key = s[start-1];
             switch(key){
                 case 'M': (*m).mode = (MODES)meta.toInt(); break;
@@ -163,13 +227,6 @@ int Communication::feed_data(Mode* m, String s){
         }
         
         if (s[i] == ';'){
-            /*
-            // Perform checksum and break
-            String meta = s.substring(start, i);
-            if (checksum & 0xff == meta.toInt())
-                return len-2;
-            else    // Checksum failed
-            */
             return 0;
         }
         start = i+1;
@@ -179,9 +236,11 @@ int Communication::feed_data(Mode* m, String s){
 }
 
 bool Communication::receive(Mode* m, int current_id){
+    if (isAPMode) return false;
+
     if (WiFi.status() == WL_CONNECTED){
         /* Request data from server */
-        String url = "http://" + WiFi.gatewayIP().toString()  + String(WIFI_REQUEST_URL) + "?id=" + current_id + "&luxid=" + LUX_ID;
+        String url = "http://" + WiFi.gatewayIP().toString()  + String(configManager.data.request_url) + "?id=" + current_id + "&luxid=" + configManager.data.lux_id;
         //Serial.println(url);
         http.begin(url);
         int httpCode = http.GET();
@@ -216,9 +275,11 @@ bool Communication::receive(Mode* m, int current_id){
 
 
 time_t Communication::check_start_time(uint8_t id, MODES mode, uint8_t* force_mode){
+    if (isAPMode) return 0-1;
+
     if (WiFi.status() == WL_CONNECTED){
         /* Request data from server */
-        String url ="http://" + WiFi.gatewayIP().toString() +  String(WIFI_TIME_CHECK_URL) + "?id=" + id + "&effect=" + mode;
+        String url ="http://" + WiFi.gatewayIP().toString() +  String(configManager.data.time_check_url) + "?id=" + id + "&effect=" + mode;
         // String url ="http://192.168.0.250" +  String(WIFI_TIME_CHECK_URL) + "?id=" + id + "&effect=" + mode;
         //Serial.println(url);
         http.begin(url);
@@ -245,6 +306,8 @@ time_t Communication::check_start_time(uint8_t id, MODES mode, uint8_t* force_mo
 
 
 void Communication::WifiErrorHandle() {
+    if (isAPMode) return;
+    
     #ifdef DEBUGGER
     Serial.println("Connection Failed! Retrying...");
     #endif
@@ -254,7 +317,11 @@ void Communication::WifiErrorHandle() {
     while (WiFi.status() != WL_CONNECTED && retryCount < WIFI_CONNECT_RETRY) {
         WiFi.disconnect();
         vTaskDelay(pdMS_TO_TICKS(1000)); // 等待1秒再重试
-        WiFi.begin(WIFI_SSID1, WIFI_PASS1);
+
+        // Try to connect again to first SSID for now (simplified retry)
+        // Ideally we should scan again or try all SSIDs
+        WiFi.begin(configManager.data.ssid[0], configManager.data.password[0]);
+        
         Serial.print("Retrying connection");
         while (WiFi.status() != WL_CONNECTED && retryCount < WIFI_CONNECT_RETRY) {
             vTaskDelay(pdMS_TO_TICKS(500)); // 每0.5秒检查一次连接状态
@@ -268,7 +335,8 @@ void Communication::WifiErrorHandle() {
         Serial.println("Reconnected successfully!");
     } else {
         Serial.println();
-        Serial.println("Reconnection Failed! Please check your network settings.");
+        Serial.println("Reconnection connect failed. Switching to AP Mode.");
+        startAP();
     }
 }
 

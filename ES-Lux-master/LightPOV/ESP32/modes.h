@@ -63,7 +63,7 @@ private:
     ColorScheduler sch;
 
     //RotationDetector detector;
-    CRGB pixels[NUMPIXELS];
+    CRGB pixels[NUMPIXELS_DEFAULT];
 
     time_t effect_entry_time;   // The time 
 
@@ -127,7 +127,7 @@ public:
 
     void bitmap(Mode* m, const uint32_t* map, int length);
 
-    void colormap(Mode* m, const uint16_t (*map)[NUMPIXELS], int length);
+    void colormap(Mode* m, const uint16_t (*map)[NUMPIXELS_DEFAULT], int length);
 
     void bitmapEs(Mode* m);
 

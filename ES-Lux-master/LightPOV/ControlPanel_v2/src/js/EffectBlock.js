@@ -248,8 +248,8 @@ class EffectBlock {
 
     // 內部：取得邊界
     _getSafeBoundaries(canvas) {
-        let minX = 0;
-        let maxX = canvas.getWidth();
+        let minX = -timelineOffset / secondsPerPixel;;
+        let maxX = Infinity;
         const activeObj = this.fabricGroup;
         
         // 計算目前作用物件的中心點 X
