@@ -6,12 +6,13 @@
 #include "config.h"
 
 #define EEPROM_SIZE 1024
-#define CONFIG_MAGIC 0xDEADBEEF
+#define CONFIG_MAGIC 0xDEADBEF0
 
 struct ConfigData {
     uint32_t magic;
     uint8_t lux_id;
     uint16_t num_pixels;
+    int32_t latency_threshold;  // Threshold in ms to prevent premature buffer clearing
     char ssid[3][32];
     char password[3][64];
     char request_url[64];
