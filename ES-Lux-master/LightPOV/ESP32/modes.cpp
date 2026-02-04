@@ -1,4 +1,5 @@
 #include "modes.h"
+#include "ConfigManager.h"
 
 #define LIMIT_OUTPUT(x) ((x)>0xff)?0xff:((x)<0?0:(x))
 
@@ -277,14 +278,18 @@ uint16_t Effects::getIdx(){
 /* Check whether to stop */
 bool Effects::checkDuration(Mode* m){
     //Serial.println(getMusicTime());
-    if (getMusicTime() < m->start_time) {
+    time_t current_time = getMusicTime();
+    
+    // Use latency threshold to prevent premature buffer clearing
+    // Only abort if we're REALLY early (beyond the threshold)
+    if (current_time + configManager.data.latency_threshold < m->start_time) {
         force_mode = 2;
         return false;
     }
     while (force_mode == 3){
         delay(100);
     }
-    return (force_mode!=2 && getMusicTime() < m->start_time + m->duration);
+    return (force_mode!=2 && current_time < m->start_time + m->duration);
 }
 
 void inline Effects::showLED(){
