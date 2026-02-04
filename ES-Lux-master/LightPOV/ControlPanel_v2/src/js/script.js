@@ -431,10 +431,6 @@ function collectExtras() {
     const inp = document.querySelector(sel);
     return inp ? Number(inp.value || 0) : 0;
   };
-  const getChecked255 = sel => {
-    const inp = document.querySelector(sel);
-    return inp && inp.checked ? 255 : 0;
-  };
 
   return {
     curvature:   getNum('[data-extra="curvature"] .param_number'),
@@ -442,7 +438,7 @@ function collectExtras() {
     bladeCount:  getNum('[data-extra="bladeCount"] .param_number'),
     boxsize:     getNum('[data-extra="boxsize"] .param_number'),
     space:       getNum('[data-extra="space"] .param_number'),
-    reverse:     getChecked255('[data-extra="reverse"] input[type="checkbox"]'),
+    reverse:     getNum('[data-extra="reverse"] input[type="checkbox"]'),
     positionFix: getNum('[data-extra="position_fix"] .param_number')
   };
 }
@@ -529,13 +525,17 @@ function packModePFields(modeStr, extras) {
       p3 = normalizeTo255(extras.boxsize, 0, 300);
       p4 = normalizeTo255(extras.space, 0, 100);
       break;
-
-    case "MODES_CMAP_DNA":
-      p1 = extras.reverse ? 255 : 0;
+    case "MODES_CMAP_FIRE":
+    case "MODES_CMAP_GEAR":
       p4 = normalizeTo255(extras.space, 0, 100);
       break;
-
-    case "MODES_CMAP_FIRE":
+    case "MODES_CMAP_DNA":
+    case "MODES_CMAP_LOVE":
+    case "MODES_MAP_ES":
+    case "MODES_MAP_ES_ZH":
+    case "MODES_MAP_ESXOPT":
+    case "MODES_MAP_ES_ZH":
+      p1 = extras.reverse >= 1 ? 255 : 0;
       p4 = normalizeTo255(extras.space, 0, 100);
       break;
   }
@@ -1328,75 +1328,40 @@ function loadAssetParams(e) {
   activeObj.canvas.requestRenderAll();
   }
 
+
 // 存檔同步函式
 function syncParamsToActiveObject(e) {
   // 檢查鎖
   if (typeof isRestoring !== 'undefined' && isRestoring) return;
   if (!currentEditingId) return;
 
-  // 自動偵測目前是哪個畫布被選取
-  let activeObj = null;
-  
-  // 先找 Canvas 1
-  if (asset_canvas1) {
-      const obj = asset_canvas1.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果 Canvas 1 沒找到，找 Canvas 2
-  if (!activeObj && asset_canvas2) {
-      const obj = asset_canvas2.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果 Canvas 2 沒找到，找 Canvas 3
-  if (!activeObj && asset_canvas3) {
-      const obj = asset_canvas3.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果 Canvas 3 沒找到，找 Canvas 4
-  if (!activeObj && asset_canvas4) {
-      const obj = asset_canvas4.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果 Canvas 4 沒找到，找 Canvas 5
-  if (!activeObj && asset_canvas5) {
-      const obj = asset_canvas5.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果 Canvas 5 沒找到，找 Canvas 6
-  if (!activeObj && asset_canvas6) {
-      const obj = asset_canvas6.getActiveObject();
-      if (obj && obj.logicBlock && obj.logicBlock.id === currentEditingId) {
-          activeObj = obj;
-      }
-  }
-  // 如果都沒找到對應 ID 的物件，就不執行
-  if (!activeObj) return;
-
-  const block = activeObj.logicBlock;
-
-  // 抓取參數並存檔
+  // 抓取面板上的最新參數
   const currentParams = capturePanelParams();
-  console.log(`[存檔] ID:${block.id} 參數更新`, currentParams);
 
-  block.params = currentParams;
-  
-  // 同步回全域資料庫 (確保匯出時也是最新的)
-  if(window.globalEffectData[block.id]) {
-      Object.assign(window.globalEffectData[block.id], currentParams);
+  // 直接寫入全域資料庫 (不依賴 activeObject，確保任何時候都存得到)
+  if(window.globalEffectData[currentEditingId]) {
+      Object.assign(window.globalEffectData[currentEditingId], currentParams);
+      console.log(`[參數存檔] ID:${currentEditingId} 更新成功`, currentParams);
   }
 
-  // 渲染該畫布
-  activeObj.canvas.requestRenderAll();
+  // 去所有畫布尋找這個方塊，更新它內部的暫存與畫面 (即時預覽)
+  const canvases = [asset_canvas1, asset_canvas2, asset_canvas3, asset_canvas4, asset_canvas5, asset_canvas6];
+  let needRender = false;
+
+  canvases.forEach(canvas => {
+      if (!canvas) return;
+      canvas.getObjects().forEach(obj => {
+          if (obj.logicBlock && obj.logicBlock.id === currentEditingId) {
+              //obj.logicBlock.params = currentParams; 
+              needRender = true;
+          }
+      });
+      // 只要這張畫布有更新，就重繪
+      if (needRender) {
+          canvas.requestRenderAll();
+          needRender = false;
+      }
+  });
 }
 
 // 全域綁定面板 Input 事件 (確保參數修改能存回方塊)
@@ -1407,7 +1372,16 @@ if (paramMain) {
     
     // 綁定
     paramMain.addEventListener('input', syncParamsToActiveObject);
-    paramMain.addEventListener('change', syncParamsToActiveObject);
+    // 修改參數確認後存檔
+    paramMain.addEventListener('change', (e) => {
+        syncParamsToActiveObject(e); // 先確保數值寫入
+        // 呼叫歷史紀錄存檔
+        setTimeout(() => {
+            if (typeof isRestoring !== 'undefined' && !isRestoring) {
+                HistoryManager.saveState();
+            }
+        }, 10);
+    });
 }
 
 // 初始化 Asset Canvas1 的 Fabric 畫布
@@ -1472,6 +1446,10 @@ function initAsset1Fabric() {
      }, 10);
   });
   bindFocusEvent(asset_canvas1);
+  // 移動/縮放完成後存檔
+  asset_canvas1.on('object:modified', () => {
+      HistoryManager.saveState();
+  });
   asset_canvas1.requestRenderAll();
 }
 
@@ -1529,6 +1507,10 @@ function initAsset2Fabric() {
     }, 10);
   });
   bindFocusEvent(asset_canvas2);
+  // 移動/縮放完成後存檔
+  asset_canvas2.on('object:modified', () => {
+      HistoryManager.saveState();
+  });
   asset_canvas2.requestRenderAll();
 }
 
@@ -1578,7 +1560,11 @@ function initAsset3Fabric() {
       }
     }, 20);
   });
-  bindFocusEvent(asset_canvas3);   
+  bindFocusEvent(asset_canvas3); 
+  // 移動/縮放完成後存檔
+  asset_canvas3.on('object:modified', () => {
+      HistoryManager.saveState();
+  });  
   asset_canvas3.requestRenderAll();
 }
 
@@ -1628,7 +1614,11 @@ function initAsset4Fabric() {
       }
     }, 20);
   });
-  bindFocusEvent(asset_canvas4);   
+  bindFocusEvent(asset_canvas4);  
+  // 移動/縮放完成後存檔
+  asset_canvas4.on('object:modified', () => {
+      HistoryManager.saveState();
+  }); 
   asset_canvas4.requestRenderAll();
 }
 function initAsset5Fabric() {
@@ -1677,7 +1667,11 @@ function initAsset5Fabric() {
       }
     }, 20);
   });
-  bindFocusEvent(asset_canvas5);   
+  bindFocusEvent(asset_canvas5); 
+  // 移動/縮放完成後存檔
+  asset_canvas5.on('object:modified', () => {
+      HistoryManager.saveState();
+  });  
   asset_canvas5.requestRenderAll();
 }
 function initAsset6Fabric() {
@@ -1726,7 +1720,11 @@ function initAsset6Fabric() {
       }
     }, 20);
   });
-  bindFocusEvent(asset_canvas6);   
+  bindFocusEvent(asset_canvas6);
+  // 移動/縮放完成後存檔
+  asset_canvas6.on('object:modified', () => {
+      HistoryManager.saveState();
+  });   
   asset_canvas6.requestRenderAll();
 }
 // 根據時間軸的 Offset 和 Zoom 更新素材位置
@@ -1827,6 +1825,8 @@ function createAssetOnCanvas(assetName, x, y, targetCanvas) {
     targetCanvas.requestRenderAll();
 
     console.log(`已建立 Block Class ID: ${newBlock.id}`);
+    // 新增方塊後存檔
+    HistoryManager.saveState();
 }
 // 用來隨時記錄滑鼠在螢幕上的位置
 let globalMousePos = { x: 0, y: 0 };
@@ -1865,6 +1865,8 @@ window.addEventListener('keydown', (e) => {
           if (paramEmpty) paramEmpty.style.display = 'block'; 
           if (paramMain) paramMain.classList.add('hidden');
           canvas.requestRenderAll();
+          // 刪除方塊後存檔
+          HistoryManager.saveState();
         }
       });
   }
@@ -1961,6 +1963,27 @@ window.addEventListener('keydown', (e) => {
         
         targetCanvas.requestRenderAll();
         console.log(`已貼上方塊 ${newId} 於 X:${Math.floor(finalX)}`);
+        // 貼上方塊後存檔
+        HistoryManager.saveState();
+    }
+
+    // Undo (Ctrl + Z)
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault(); // 阻止瀏覽器預設的復原
+        // 如果目前焦點還在輸入框內，強制失去焦點以觸發最後一次的參數存檔
+        if (document.activeElement && 
+           (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) {
+            document.activeElement.blur(); 
+        }
+        setTimeout(() => {
+            HistoryManager.undo();
+        }, 20);
+    }
+
+    // Redo (Ctrl + Y  或  Ctrl + Shift + Z)
+    if (isCmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        HistoryManager.redo();
     }
 });
 // Initialization
@@ -2167,15 +2190,19 @@ function applyExtrasFromPFields(modeStr, p1, p2, p3, p4) {
       setExtraNumber("space",   p4, 0, 100);
       break;
 
-    case "MODES_CMAP_DNA": {
-      // reverse: 0 or 255
-      const chk = document.querySelector('[data-extra="reverse"] input[type="checkbox"]');
-      if (chk) chk.checked = (p1 >= 128);
+    case "MODES_CMAP_DNA":
+    case "MODES_CMAP_LOVE":
+    case "MODES_MAP_ES":
+    case "MODES_MAP_ES_ZH":
+    case "MODES_MAP_ESXOPT":
+    case "MODES_MAP_ES_ZH": {
+      setExtraNumber("reverse", p1, 0, 1);
       setExtraNumber("space", p4, 0, 100);
       break;
     }
 
     case "MODES_CMAP_FIRE":
+    case "MODES_CMAP_GEAR":
       setExtraNumber("space", p4, 0, 100);
       break;
   }
@@ -2439,7 +2466,7 @@ function generateProjectJson() {
         const boxsize    = block.boxsize || 0;
         const space      = block.space || 0;
         const positionFix= block.position_fix || 0;
-        const reverse    = block.reverse ? true : false; // boolean
+        const reverse    = block.reverse || 0;
 
         // 根據模式填入 p1~p4
         switch (modeStr) {
@@ -2461,10 +2488,16 @@ function generateProjectJson() {
                 p4 = space;
                 break;
             case "MODES_CMAP_DNA":
-                p1 = reverse ? 255 : 0;
+            case "MODES_CMAP_LOVE":
+            case "MODES_MAP_ES":
+            case "MODES_MAP_ES_ZH":
+            case "MODES_MAP_ESXOPT":
+            case "MODES_MAP_ES_ZH":
+                p1 = reverse >= 1 ? 255 : 0;
                 p4 = space;
                 break;
             case "MODES_CMAP_FIRE":
+            case "MODES_CMAP_GEAR":
                 p4 = space;
                 break;
         }
@@ -2641,10 +2674,16 @@ function unpackExtrasToParams(modeStr, p1, p2, p3, p4) {
             params.space   = p4;
             break;
         case "MODES_CMAP_DNA":
-            params.reverse = (p1 >= 128); // Boolean
+        case "MODES_CMAP_LOVE":
+        case "MODES_MAP_ES":
+        case "MODES_MAP_ES_ZH":
+        case "MODES_MAP_ESXOPT":
+        case "MODES_MAP_ES_ZH":
+            params.reverse = (p1 >= 128)? 1:0; // Boolean
             params.space   = p4;
             break;
         case "MODES_CMAP_FIRE":
+        case "MODES_CMAP_GEAR":
             params.space = p4;
             break;
     }
@@ -2872,7 +2911,7 @@ function importProjectFromJson(jsonArray) {
             };
             // 建立並渲染方塊
             const newBlock = new EffectBlock(currentId, assetName);
-            newBlock.params = restoredParams;
+            //newBlock.params = restoredParams;
             newBlock.startTime = startTimeSec;
             newBlock.duration = durationSec;
 
@@ -3364,3 +3403,95 @@ function bindFocusEvent(canvasInstance) {
         lastFocusedCanvas = canvasInstance;  
     });
 }
+// undo/redo 功能
+
+const HistoryManager = {
+    undoStack: [],
+    redoStack: [],
+    maxHistory: 20, // 限制步數，避免記憶體爆掉
+    isLocked: false, // 防止在還原時觸發自動存檔
+
+    // 儲存當前狀態 (在動作發生後呼叫)
+    saveState: function() {
+        if (this.isLocked) return;
+
+        // 取得目前專案的完整 JSON
+        const currentState = JSON.stringify(generateProjectJson());
+
+        // 如果目前的狀態跟上一次存的一樣，就不要重複存 (避免沒動也存)
+        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === currentState) {
+            return;
+        }
+
+        // 存入 Undo Stack
+        this.undoStack.push(currentState);
+
+        // 超過限制就移除最舊的
+        if (this.undoStack.length > this.maxHistory) {
+            this.undoStack.shift();
+        }
+
+        // 只要有新動作，Redo Stack 就要清空
+        this.redoStack = [];
+        
+        console.log(`[History] State Saved. Undo: ${this.undoStack.length}, Redo: ${this.redoStack.length}`);
+    },
+
+    // 執行 Undo (Ctrl+Z)
+    undo: function() {
+        if (this.undoStack.length <= 1) { // 至少要留一個初始狀態
+            console.log("No more undo steps.");
+            return;
+        }
+
+        this.isLocked = true; // 上鎖，避免還原過程又觸發 saveState
+
+        // 把「現在」的狀態丟進 Redo Stack (這樣等等才能 Redo 回來)
+        const currentState = this.undoStack.pop(); 
+        this.redoStack.push(currentState);
+
+        // 讀取 Undo Stack 裡面的「上一步」
+        const prevStateStr = this.undoStack[this.undoStack.length - 1];
+        const prevState = JSON.parse(prevStateStr);
+
+        // 載入該狀態
+        importProjectFromJson(prevState);
+
+        console.log(`[History] Undo Performed.`);
+        
+        // 解鎖
+        setTimeout(() => { this.isLocked = false; }, 100);
+    },
+
+    // 執行 Redo (Ctrl+Y 或 Ctrl+Shift+Z)
+    redo: function() {
+        if (this.redoStack.length === 0) {
+            console.log("No more redo steps.");
+            return;
+        }
+
+        this.isLocked = true;
+
+        // 從 Redo Stack 取出下一步
+        const nextStateStr = this.redoStack.pop();
+        
+        // 把這個狀態推回 Undo Stack
+        this.undoStack.push(nextStateStr);
+
+        // 載入
+        const nextState = JSON.parse(nextStateStr);
+        importProjectFromJson(nextState);
+
+        console.log(`[History] Redo Performed.`);
+
+        setTimeout(() => { this.isLocked = false; }, 100);
+    }
+};
+
+// 初始化：網頁載入完成後，先存一個「初始狀態」
+document.addEventListener('DOMContentLoaded', () => {
+    // 延遲一點點確保 initAll 跑完
+    setTimeout(() => {
+        HistoryManager.saveState();
+    }, 1000);
+});

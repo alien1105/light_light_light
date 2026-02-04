@@ -4,7 +4,7 @@
 // #define DEBUGGER
 // #define DEBUGGER_TASK_REPORT
 
-#define LUX_ID_DEFAULT 3
+#define LUX_ID_DEFAULT 0
 
 /* Type Definition */
 #define time_t unsigned long

@@ -28,6 +28,7 @@ void ConfigManager::resetToDefaults() {
     data.magic = CONFIG_MAGIC;
     data.lux_id = LUX_ID_DEFAULT;
     data.num_pixels = NUMPIXELS_DEFAULT;
+    data.latency_threshold = 500;  // Default 500ms threshold
     
     strncpy(data.ssid[0], WIFI_SSID1_DEFAULT, 32);
     strncpy(data.password[0], WIFI_PASS1_DEFAULT, 64);
