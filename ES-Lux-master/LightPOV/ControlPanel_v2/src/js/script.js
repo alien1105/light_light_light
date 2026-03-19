@@ -1962,6 +1962,18 @@ window.addEventListener('keydown', (e) => {
         targetCanvas.requestRenderAll();
         console.log(`已貼上方塊 ${newId} 於 X:${Math.floor(finalX)}`);
     }
+
+    // Undo (Ctrl + Z)
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault(); // 阻止瀏覽器預設的復原
+        HistoryManager.undo();
+    }
+
+    // Redo (Ctrl + Y  或  Ctrl + Shift + Z)
+    if (isCmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        HistoryManager.redo();
+    }
 });
 // Initialization
 function initAll() {
@@ -3364,3 +3376,95 @@ function bindFocusEvent(canvasInstance) {
         lastFocusedCanvas = canvasInstance;  
     });
 }
+// undo/redo 功能
+
+const HistoryManager = {
+    undoStack: [],
+    redoStack: [],
+    maxHistory: 20, // 限制步數，避免記憶體爆掉
+    isLocked: false, // 防止在還原時觸發自動存檔
+
+    // 儲存當前狀態 (在動作發生後呼叫)
+    saveState: function() {
+        if (this.isLocked) return;
+
+        // 取得目前專案的完整 JSON
+        const currentState = JSON.stringify(generateProjectJson());
+
+        // 如果目前的狀態跟上一次存的一樣，就不要重複存 (避免沒動也存)
+        if (this.undoStack.length > 0 && this.undoStack[this.undoStack.length - 1] === currentState) {
+            return;
+        }
+
+        // 存入 Undo Stack
+        this.undoStack.push(currentState);
+
+        // 超過限制就移除最舊的
+        if (this.undoStack.length > this.maxHistory) {
+            this.undoStack.shift();
+        }
+
+        // 只要有新動作，Redo Stack 就要清空
+        this.redoStack = [];
+        
+        console.log(`[History] State Saved. Undo: ${this.undoStack.length}, Redo: ${this.redoStack.length}`);
+    },
+
+    // 執行 Undo (Ctrl+Z)
+    undo: function() {
+        if (this.undoStack.length <= 1) { // 至少要留一個初始狀態
+            console.log("No more undo steps.");
+            return;
+        }
+
+        this.isLocked = true; // 上鎖，避免還原過程又觸發 saveState
+
+        // 把「現在」的狀態丟進 Redo Stack (這樣等等才能 Redo 回來)
+        const currentState = this.undoStack.pop(); 
+        this.redoStack.push(currentState);
+
+        // 讀取 Undo Stack 裡面的「上一步」
+        const prevStateStr = this.undoStack[this.undoStack.length - 1];
+        const prevState = JSON.parse(prevStateStr);
+
+        // 載入該狀態
+        importProjectFromJson(prevState);
+
+        console.log(`[History] Undo Performed.`);
+        
+        // 解鎖
+        setTimeout(() => { this.isLocked = false; }, 100);
+    },
+
+    // 執行 Redo (Ctrl+Y 或 Ctrl+Shift+Z)
+    redo: function() {
+        if (this.redoStack.length === 0) {
+            console.log("No more redo steps.");
+            return;
+        }
+
+        this.isLocked = true;
+
+        // 從 Redo Stack 取出下一步
+        const nextStateStr = this.redoStack.pop();
+        
+        // 把這個狀態推回 Undo Stack
+        this.undoStack.push(nextStateStr);
+
+        // 載入
+        const nextState = JSON.parse(nextStateStr);
+        importProjectFromJson(nextState);
+
+        console.log(`[History] Redo Performed.`);
+
+        setTimeout(() => { this.isLocked = false; }, 100);
+    }
+};
+
+// 初始化：網頁載入完成後，先存一個「初始狀態」
+document.addEventListener('DOMContentLoaded', () => {
+    // 延遲一點點確保 initAll 跑完
+    setTimeout(() => {
+        HistoryManager.saveState();
+    }, 1000);
+});
