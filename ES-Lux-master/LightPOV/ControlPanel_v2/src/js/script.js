@@ -1985,6 +1985,18 @@ window.addEventListener('keydown', (e) => {
         e.preventDefault();
         HistoryManager.redo();
     }
+
+    // Undo (Ctrl + Z)
+    if (isCmdOrCtrl && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault(); // 阻止瀏覽器預設的復原
+        HistoryManager.undo();
+    }
+
+    // Redo (Ctrl + Y  或  Ctrl + Shift + Z)
+    if (isCmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+        e.preventDefault();
+        HistoryManager.redo();
+    }
 });
 // Initialization
 function initAll() {
