@@ -1,25 +1,25 @@
 [
   [
     {
-      "mode": "MODES_CLEAR",
-      "start_time": 0,
-      "duration": 1000,
+      "mode": "MODES_SQUARE",
+      "start_time": 586,
+      "duration": 5199,
       "XH": {
-        "func": 0,
+        "func": 1,
         "range": 0,
         "lower": 0,
-        "p1": 0,
+        "p1": 72,
         "p2": 0
       },
       "XS": {
-        "func": 0,
+        "func": 1,
         "range": 0,
         "lower": 0,
-        "p1": 0,
+        "p1": 171,
         "p2": 0
       },
       "XV": {
-        "func": 0,
+        "func": 1,
         "range": 0,
         "lower": 0,
         "p1": 0,
@@ -40,66 +40,15 @@
         "p2": 0
       },
       "YV": {
-        "func": 0,
-        "range": 0,
+        "func": 5,
+        "range": 16,
         "lower": 0,
-        "p1": 0,
-        "p2": 0
+        "p1": 230,
+        "p2": 2
       },
       "p1": 0,
       "p2": 0,
-      "p3": 0,
-      "p4": 0
-    },
-    {
-      "mode": "MODES_PLAIN",
-      "start_time": 1000,
-      "duration": 1000,
-      "XH": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "XS": {
-        "func": 1,
-        "range": 0,
-        "lower": 0,
-        "p1": 255,
-        "p2": 0
-      },
-      "XV": {
-        "func": 1,
-        "range": 0,
-        "lower": 0,
-        "p1": 102,
-        "p2": 0
-      },
-      "YH": {
-        "func": 3,
-        "range": 32,
-        "lower": 0,
-        "p1": 36,
-        "p2": 0
-      },
-      "YS": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "YV": {
-        "func": 0,
-        "range": 0,
-        "lower": 0,
-        "p1": 0,
-        "p2": 0
-      },
-      "p1": 0,
-      "p2": 0,
-      "p3": 0,
+      "p3": 50,
       "p4": 0
     }
   ]

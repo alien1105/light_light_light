@@ -1005,7 +1005,7 @@ if (clipStartSec < 0) clipStartSec = 0;
 
 // Global play control (engine) - RAF tick advances globalTime
 function playGlobal() {
-  if (!audioBuffer) return;
+  //if (!audioBuffer) return;
   if (!isPlaying) {
     isPlaying = true;
     lastRAFTime = performance.now();
@@ -1032,6 +1032,15 @@ function rafTick(now) {
 
   if (isPlaying) {
     globalTime += delta;
+    // 更新預覽器的時間與數據
+    const previewEl = document.getElementById('realtime_preview');
+    if (previewEl) {
+        // 將秒數轉換為預覽器需要的 index (1ms = 1 index)
+        previewEl.set_start_time = Math.floor(globalTime * 1000);
+        
+        // 播放時持續同步最新的方塊參數
+        previewEl.mode_json_data = generateProjectJson()[0]; 
+    }
     if (globalTime < 0) globalTime = 0;
 
     // sync audio to engine: only when in clip range
@@ -1099,6 +1108,7 @@ function seekGlobal(t,center = true) {
   ensureAudioSyncToGlobal();
   updateTimeUI();
   drawTimeline();
+  updatePreviewData();
 }
 
 // Time input jump handler
@@ -1192,7 +1202,7 @@ fileInput.addEventListener('change', async (e) => {
 
 // Play / Pause / Stop handlers
 playToggle.addEventListener('click', async () => {
-  if (!audioBuffer) return;
+  //if (!audioBuffer) return;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') await audioCtx.resume();
 
@@ -1201,6 +1211,7 @@ playToggle.addEventListener('click', async () => {
   } else {
     pauseGlobal();
   }
+  updatePreviewData();
 });
 
 stopBtn.addEventListener('click', () => {
@@ -1209,6 +1220,7 @@ stopBtn.addEventListener('click', () => {
   ensureAudioSyncToGlobal();
   updateTimeUI();
   drawTimeline();
+  updatePreviewData();
 });
 
 // Volume control
@@ -1362,6 +1374,7 @@ function syncParamsToActiveObject(e) {
           needRender = false;
       }
   });
+  updatePreviewData();
 }
 
 // 全域綁定面板 Input 事件 (確保參數修改能存回方塊)
@@ -1869,6 +1882,7 @@ window.addEventListener('keydown', (e) => {
           HistoryManager.saveState();
         }
       });
+      updatePreviewData();
   }
   // 檢查是否按下了 Ctrl (Mac 是 Command)
     const isCmdOrCtrl = e.ctrlKey || e.metaKey;
@@ -1965,6 +1979,7 @@ window.addEventListener('keydown', (e) => {
         console.log(`已貼上方塊 ${newId} 於 X:${Math.floor(finalX)}`);
         // 貼上方塊後存檔
         HistoryManager.saveState();
+        updatePreviewData();
     }
 
     // Undo (Ctrl + Z)
@@ -1978,19 +1993,21 @@ window.addEventListener('keydown', (e) => {
         setTimeout(() => {
             HistoryManager.undo();
         }, 20);
+        updatePreviewData();
     }
 
     // Redo (Ctrl + Y  或  Ctrl + Shift + Z)
     if (isCmdOrCtrl && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
         e.preventDefault();
         HistoryManager.redo();
+        updatePreviewData();
     }
 });
 // Initialization
 function initAll() {
   // UI defaults
-  playToggle.disabled = true;
-  stopBtn.disabled = true;
+  playToggle.disabled = false;
+  stopBtn.disabled = false;
   volumeValue.textContent = `${Math.round((volumeSlider.value || 100))}%`;
 
   // timeline init
@@ -2933,7 +2950,9 @@ function importProjectFromJson(jsonArray) {
     if (jsonArray[4]) restoreTrack(jsonArray[4], asset_canvas5, 5);
     if (jsonArray[5]) restoreTrack(jsonArray[5], asset_canvas6, 6);
     console.log(`[匯入成功] 已還原軌道資料`);
-    
+    setTimeout(() => {
+        updatePreviewData();
+    }, 50);
 }
 
 // 綁定匯入按鈕事件
@@ -3495,3 +3514,24 @@ document.addEventListener('DOMContentLoaded', () => {
         HistoryManager.saveState();
     }, 1000);
 });
+
+// 建立一個橋接函式，將目前畫布所有方塊轉成 pre_view 看得懂的 JSON 格式
+function updatePreviewData() {
+    const previewEl = document.getElementById('realtime_preview');
+    if (previewEl) {
+        // 重新抓取目前畫布上（第一軌）的最新數據
+        const currentProject = generateProjectJson();
+        previewEl.mode_json_data = currentProject[0] || [];
+        
+        // 重設預覽器的時間與狀態，防止它卡在舊檔案的 pre_color_count
+        previewEl.set_start_time = Math.floor(globalTime * 1000);
+        
+        // 觸發元件內部的 perform 以重新計算顏色陣列
+        if (typeof previewEl.perform === 'function') {
+            previewEl.pre_color_count = previewEl.set_start_time;
+            previewEl.pre_color_count_id = 0;
+            previewEl.perform();
+        }
+        console.log("[Preview] 數據已同步更新");
+    }
+}

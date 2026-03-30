@@ -40,7 +40,19 @@
                 
             </div>
         </div> 
-        <div>hello</div>
+        <div class="preview_container">
+            <header class="preview_header">即時效果預覽</header>
+            <div class="preview_area">
+                <pre-view   id="realtime_preview" 
+                            width="450" 
+                            height="450" 
+                            led-bulb-size="3" 
+                            inner-radius="40"
+                            speed="0.3">
+                </pre-view>
+            </div>
+        </div>
+
         <div class="param_panel">
 
             <!-- Tabs -->
@@ -1040,5 +1052,6 @@
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="./js/EffectBlock.js"></script>
     <script src="./js/script.js"></script>
+    <script type="module" src="./pre_view3.0/pre_view.js"></script>
 </body>
 </html>
