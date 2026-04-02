@@ -36,15 +36,15 @@ class Pre_view extends HTMLElement {
     
     
     async connectedCallback() { //當元件被加入到 DOM 時觸發
-
-        const width             = this.getAttribute('width')  || 500;
-        const height            = this.getAttribute('height') || 500;
+        
+        const width             = Number(this.getAttribute('width'))  || 500;
+        const height            = Number(this.getAttribute('height')) || 500;
         const data_path         = this.getAttribute("pre-view-data");
-        this.led_bulb_size      = this.getAttribute('led-bulb-size') || 2;
-        this.inner_radius       = this.getAttribute('inner-radius') || 80;
-        this.led_bulb_spacing   = this.getAttribute('led-bulb-spacing') || 3;
+        this.led_bulb_size      = Number(this.getAttribute('led-bulb-size')) || 2;
+        this.inner_radius       = Number(this.getAttribute('inner-radius')) || 80;
+        this.led_bulb_spacing   = Number(this.getAttribute('led-bulb-spacing')) || 3;
         this.anime              = (this.getAttribute('anime') || "false") == "true";
-        this.speed              = this.getAttribute('speed') || 60;  // rad/s
+        this.speed              = Number(this.getAttribute('speed')) || 60;  // rad/s
         this.mode_idx           = Number(this.getAttribute('mode-idx')) || 0;
         this.set_start_time     = Number(this.getAttribute('set-start-time')) || 0;
         
@@ -52,13 +52,18 @@ class Pre_view extends HTMLElement {
         this.angular_speed      = 0.9; // degree/ms
         this.pre_color_count    = 0;
         this.pre_color_count_id = 0;
+        // 建立 canvas
+        this.canvas = document.createElement('canvas');
+        this.canvas.width = width;
+        this.canvas.height = height;
+
+         // 將 canvas 加入 shadow DOM
+        this.shadowRoot.appendChild(this.canvas);
 
 
-    //-----------------------------------------------------------
-    //  讀取json檔
-    //-----------------------------------------------------------
+        //  讀取json檔
 
-        this.mode_json_data = await this.loadJSON(data_path);     
+        /*this.mode_json_data = await this.loadJSON(data_path);     
     
 
         for(let i=0; i<this.set_start_time; i++){
@@ -66,7 +71,7 @@ class Pre_view extends HTMLElement {
             this.pre_color_count++;
             this.checkDuration(this.mode_json_data[this.pre_color_count_id]);
             this.pre_color_count_id = 0;
-        }
+        }*/
 
     //-----------------------------------------------------------
     //  建立畫布
@@ -116,8 +121,8 @@ class Pre_view extends HTMLElement {
             }   
         } 
         //建立二維陣列存放 LED 資料 this.led_show_arr[60][32][3]
-        this.led_show_arr = new Array(1000000);
-        for (let i = 0; i < 1000000; i++) {
+        this.led_show_arr = new Array(100000);
+        for (let i = 0; i < 100000; i++) {
             this.led_show_arr[i] = new Array(32);
             for (let j = 0; j < 32; j++) {
                 this.led_show_arr[i][j] = new Array(4).fill(0); 
@@ -141,142 +146,91 @@ class Pre_view extends HTMLElement {
         this.update(0);
     }
 
-
+    // [pre_view.js] 新增這兩個函式到 class 內
+    // 接收即時資料並重新計算
+    updateData(modeData) {
+    if (!modeData) return;
     
+    // 1. 清空舊數據
+    this.pre_color_count = 0; 
+    this.pre_color_count_id = 0;
+    this.mode_json_data = [modeData]; // 將單一效果包裝成陣列
+
+    // 2. 執行計算 (這會填充 led_show_arr)
+    this.perform(); 
+
+    // 3. 確保動畫迴圈啟動
+    if (!this.animationFrameId) {
+        this.update(0);
+    }
+}
+
+
+
     //讀取 json & 繪製，並將長方形內容偏移到圓形上，更新頻率約為60fps(以瀏覽器為準)
     async drawSomething(timer) {
-        const angular_speed = this.angular_speed; // degree/ms
-        const delta_angle = angular_speed; // delta degree pre ms
-        const start_time = performance.now()-this.start_time+this.set_start_time*ESP_LEDSHOW_DELAY; // ms
-        const start_angle = (start_time * delta_angle) % 360; // degree
+        const speed = this.speed;
+        const led_show_arr = this.led_show_arr; // 使用 class 內部的資料庫
+        if (!led_show_arr || !led_show_arr[0]) return; // 安全檢查
 
-        //  let show_time = Math.floor(10000/speed);
+        let show_time = Math.floor(10000/speed);
 
         timer++;
-       // if(Math.floor(timer)%60==0) console.log('a callback');
+        if(Math.floor(timer)%60==0) console.log(Math.floor(timer)/60);
 
     
-        //開始渲染啦!!        
+        //開始渲染啦!!
+        
         this.ctx = this.canvas.getContext('2d', {willReadFrequently: true}); //增加 willReadFrequently 選項以提升讀取效能
         let imageData = this.ctx.getImageData(0, 0, this.canvas.width, this.canvas.height);
-         for (let i = 0; i < this.canvas.width; i++) {
-            for (let j = 0; j < this.canvas.height; j++) {
-                const idx = (j * this.canvas.width + i) * 4;
-                imageData.data[idx] = 0;
-                imageData.data[idx + 1] = 0;
-                imageData.data[idx + 2] = 0;
-                imageData.data[idx + 3] = 255; 
-            }   
-        }        
-        //繪製灰色網格
-        for (let i = 0; i < this.canvas.width; i+=20) {
-            for (let j = 0; j < this.canvas.height; j++) {
-                const idx = (j * this.canvas.width + i) * 4;
-                imageData.data[idx] = 27;
-                imageData.data[idx + 1] = 27;
-                imageData.data[idx + 2] = 27;
-                imageData.data[idx + 3] = 255; 
-            }   
-        }         
-        for (let i = 0; i < this.canvas.width; i++) {
-            for (let j = 0; j < this.canvas.height; j+=20) {
-                const idx = (j * this.canvas.width + i) * 4;
-                imageData.data[idx] = 27;
-                imageData.data[idx + 1] = 27;
-                imageData.data[idx + 2] = 27;
-                imageData.data[idx + 3] = 255; 
-            }   
-        } 
-
-        let current_angle = start_angle;
-        let current_time  = start_time;
-        let r, g, b;
         
-        //console.log(`start_angle: ${start_angle}, start_time: ${start_time}`);
-
-        while(this.pre_color_count < current_time+360/(delta_angle*ESP_LEDSHOW_DELAY)){ 
-            this.perform();
-        }
 
 
-        for (let deltas_degree=0; deltas_degree<180; deltas_degree+=delta_angle*ESP_LEDSHOW_DELAY) {
+        //將長方形內的內容偏移到圓形上
+        for (let i = 0; i < ((this.anime)?timer*speed/20 +30:show_time); i++) {
             for (let j = 0; j < 32; j++) {     
                 //顏色
-                // let l = Math.floor(current_time);
-                let l = Math.floor((current_time)/ESP_LEDSHOW_DELAY);
-                //console.log(`delta_angle: ${l}`);
-                let darken = Math.floor((start_angle+100-current_angle)*2);
-                r = (this.led_show_arr[l][j][0] - darken > 0)? this.led_show_arr[l][j][0] - darken : 0;
-                g = (this.led_show_arr[l][j][1] - darken > 0)? this.led_show_arr[l][j][1] - darken : 0;
-                b = (this.led_show_arr[l][j][2] - darken > 0)? this.led_show_arr[l][j][2] - darken : 0; 
+                let r, g, b;
+                r = led_show_arr[i][j][0];
+                g = led_show_arr[i][j][1];
+                b = led_show_arr[i][j][2]; 
                 //位置
                 const cx = this.canvas.width>>1; // 圓心 X
                 const cy = this.canvas.height>>1; // 圓心 Y
                 const inner_radius = this.inner_radius;
                 const outer_radius = inner_radius + 140;
-                // console.log(`${deltas_degree}, ${l}`);
-                let col_x = cx + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.sin(current_angle/180*Math.PI*(-1)) ) );
-                let col_y = cy + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.cos(current_angle/180*Math.PI*(-1)) ) );
-                let col_x2 = cx + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.sin((current_angle+180)/180*Math.PI*(-1)) ) );
-                let col_y2 = cy + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.cos((current_angle+180)/180*Math.PI*(-1)) ) );
-                for(let w=0; w<this.led_bulb_size; w++){
-                    for(let h=0; h<this.led_bulb_size; h++){
-                        const idx = ((col_y+w) * this.canvas.width + col_x+h) * 4;
-                        if(deltas_degree<SHOW_ANGLE){
-                            imageData.data[idx] = r;
-                            imageData.data[idx + 1] = g;
-                            imageData.data[idx + 2] = b;
-                            imageData.data[idx + 3] = 256; 
-                        }else{
+                //console.log(`${inner_radius}`);
+                let col_x = cx + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.sin( ((i*(-1)+show_time/2)/show_time)*2*Math.PI ) ) );
+                let col_y = cy + (Math.round( ( (outer_radius-j*this.led_bulb_spacing) ) * Math.cos( ((i*(-1)+show_time/2)/show_time)*2*Math.PI ) ) );
+                
+                //繪製小方塊
+                if(((this.anime)?(i < timer*speed/20-30):(false))){
+                    for(let w=0; w<this.led_bulb_size; w++){
+                        for(let h=0; h<this.led_bulb_size; h++){
+                            const idx = ((col_y+w) * this.canvas.width + col_x+h) * 4;
                             imageData.data[idx] = 0;
                             imageData.data[idx + 1] = 0;
                             imageData.data[idx + 2] = 0;
                             imageData.data[idx + 3] = 256; 
                         }
                     }
-                }
-                for(let w=0; w<this.led_bulb_size; w++){
-                    for(let h=0; h<this.led_bulb_size; h++){
-                        const idx = ((col_y2+w) * this.canvas.width + col_x2+h) * 4;
-                        if(deltas_degree<SHOW_ANGLE){
-                            imageData.data[idx] = r;
-                            imageData.data[idx + 1] = g;
-                            imageData.data[idx + 2] = b;
-                            imageData.data[idx + 3] = 256; 
-                        }else{
-                            imageData.data[idx] = 0;
-                            imageData.data[idx + 1] = 0;
-                            imageData.data[idx + 2] = 0;
+                }else{
+                    for(let w=0; w<this.led_bulb_size; w++){
+                        for(let h=0; h<this.led_bulb_size; h++){
+                            const darken = ((this.anime)?((timer*speed/20+15-i)*3):0)
+                            const idx = ((col_y+w) * this.canvas.width + col_x+h) * 4;
+                            imageData.data[idx] = r-darken;
+                            imageData.data[idx + 1] = g-darken;
+                            imageData.data[idx + 2] = b-darken;
                             imageData.data[idx + 3] = 256; 
                         }
                     }
                 }
             }
-            current_angle += delta_angle * ESP_LEDSHOW_DELAY;
-            current_time  += ESP_LEDSHOW_DELAY;
-            
         }
+ 
 
         this.ctx.putImageData(imageData, 0, 0);
-
-        // 2. 開始繪製文字 (放在 putImageData 之後才不會被覆蓋)
-        const padding = 20;
-        const fontSize = 16;
-        this.ctx.font = `${fontSize}px monospace`; // 使用等寬字體排版較整齊
-        this.ctx.fillStyle = "cyan"; // 換個顯眼的顏色
-        this.ctx.textAlign = "right";
-
-        // 取得目前的 Mode 名稱
-        const currentModeName = this.getCurrentModeName(Math.floor(current_time / ESP_LEDSHOW_DELAY));
-
-        // 準備顯示文字
-        const timeText = `Time: ${Math.floor(current_time / ESP_LEDSHOW_DELAY)}`;
-        const modeText = `Mode: ${currentModeName}`;
-
-        // 繪製兩行文字
-        this.ctx.fillText(modeText, this.canvas.width - padding, this.canvas.height - padding - 25);
-        this.ctx.fillText(timeText, this.canvas.width - padding, this.canvas.height - padding);
-
     }
     
     getCurrentModeName(currentTime) {
@@ -295,7 +249,8 @@ class Pre_view extends HTMLElement {
         requestAnimationFrame(() => this.update((timer+1)));
     }
 
-    perform(){        
+    perform(){   
+        //if (!this.mode_json_data) return;     
         //console.log(`mode_json_data.length: ${this.mode_json_data.length}, pre_color_count_id: ${this.pre_color_count_id}`);
         let start_pre_color_count = this.pre_color_count;
         while(this.pre_color_count - start_pre_color_count < 2000){  

@@ -41,7 +41,36 @@ body {
 }
 
 /* 效果預覽區 */
+.preview_container {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+}
 
+.preview_header {
+    background: #1c1c1c;
+    padding: 8px;
+    font-size: 13px;
+    color: #4fb3d6;
+    border-bottom: 1px solid #333;
+    text-align: center;
+}
+
+.preview_area {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+}
+
+/* 讓 Canvas 在預覽器內自適應 */
+pre-view {
+    display: block;
+}
 
 /* 左側素材庫 */
 .Asset_library {

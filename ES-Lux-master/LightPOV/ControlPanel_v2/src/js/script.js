@@ -1040,6 +1040,12 @@ function rafTick(now) {
     updateTimeUI();
     updatePlayheadVisual();
 
+    // 同步預覽元件的時間
+    if (previewComponent) {
+        // 將秒轉為毫秒傳給元件
+        previewComponent.setAttribute('set-start-time', Math.floor(globalTime * 1000));
+    }
+
     // we render once per frame when playing
     timescale_canvas.requestRenderAll();
   }
@@ -1094,6 +1100,11 @@ function seekGlobal(t,center = true) {
     
     // 確保 timelineOffset 不為負值
     timelineOffset = Math.max(0, newOffset);
+  }
+
+  // 拖動時間軸時同步預覽
+  if (previewComponent) {
+      previewComponent.setAttribute('set-start-time', Math.floor(globalTime * 1000));
   }
 
   // 3. 執行同步和重繪
@@ -1325,6 +1336,12 @@ function loadAssetParams(e) {
   // 解鎖
   setTimeout(() => {
     isRestoring = false;
+    // 載入完成後，立刻更新預覽器
+    const previewComponent = document.getElementById('live_preview');
+    if (previewComponent && typeof previewComponent.updateData === 'function') {
+        const previewData = buildSegmentFromUI(0, 1000); 
+        previewComponent.updateData(previewData);
+    }
   }, 10);
   activeObj.canvas.requestRenderAll();
   }
@@ -1343,6 +1360,13 @@ function syncParamsToActiveObject(e) {
   if(window.globalEffectData[currentEditingId]) {
       Object.assign(window.globalEffectData[currentEditingId], currentParams);
       console.log(`[參數存檔] ID:${currentEditingId} 更新成功`, currentParams);
+  }
+  // 更新即時預覽器 (Live Preview) 
+  const previewComponent = document.getElementById('live_preview');
+  if (previewComponent && typeof previewComponent.updateData === 'function') {
+      // 藉由您原有的 buildSegmentFromUI 函式，把目前的 UI 參數打包成 preview 需要的 JSON 格式
+      const previewData = buildSegmentFromUI(0, 1000); 
+      previewComponent.updateData(previewData);
   }
 
   // 去所有畫布尋找這個方塊，更新它內部的暫存與畫面 (即時預覽)
@@ -3496,3 +3520,30 @@ document.addEventListener('DOMContentLoaded', () => {
         HistoryManager.saveState();
     }, 1000);
 });
+// 假設你有一個收集所有效果方塊資料的 function
+function updatePreview() {
+    const previewElement = document.querySelector('pre-view');
+    
+    // 從你的 UI 方塊中提取資料
+    // 這裡的格式必須符合 server.js 中定義的 Mode 結構
+    const currentEffects = allEffectBlocks.map(block => ({
+        mode: block.mode,
+        start_time: block.startTime,
+        duration: block.duration,
+        XH: block.XH, // 包含 func, range, lower, p1, p2 等
+        XS: block.XS,
+        XV: block.XV,
+        YH: block.YH,
+        YS: block.YS,
+        YV: block.YV,
+        p1: block.p1,
+        p2: block.p2,
+        p3: block.p3,
+        p4: block.p4
+    }));
+
+    // 直接把物件丟給元件，不透過 JSON 檔案
+    if (previewElement) {
+        previewElement.effectData = currentEffects;
+    }
+}
