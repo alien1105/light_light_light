@@ -13,6 +13,7 @@
 })();
 
 // DOM elements
+const previewComponent = document.getElementById('main-preview');
 const fileInput = document.getElementById('fileInput');
 const musicFileLoadBtn = document.getElementById('music_file_load_Btn');
 const audio = document.getElementById('audio');
@@ -1005,7 +1006,7 @@ if (clipStartSec < 0) clipStartSec = 0;
 
 // Global play control (engine) - RAF tick advances globalTime
 function playGlobal() {
-  if (!audioBuffer) return;
+  //if (!audioBuffer) return;
   if (!isPlaying) {
     isPlaying = true;
     lastRAFTime = performance.now();
@@ -1192,7 +1193,7 @@ fileInput.addEventListener('change', async (e) => {
 
 // Play / Pause / Stop handlers
 playToggle.addEventListener('click', async () => {
-  if (!audioBuffer) return;
+  //if (!audioBuffer) return;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   if (audioCtx.state === 'suspended') await audioCtx.resume();
 
@@ -1989,8 +1990,8 @@ window.addEventListener('keydown', (e) => {
 // Initialization
 function initAll() {
   // UI defaults
-  playToggle.disabled = true;
-  stopBtn.disabled = true;
+  playToggle.disabled = false;
+  stopBtn.disabled = false;
   volumeValue.textContent = `${Math.round((volumeSlider.value || 100))}%`;
 
   // timeline init
